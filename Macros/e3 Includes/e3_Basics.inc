@@ -1709,25 +1709,6 @@ SUB check_Manastone
     /if ((!${Me.CombatState.Equal[DEBUFFED]}) && !${Me.Invis} && ${Bool[${FindItem[=Manastone]}]} && ${Me.PctMana} < 70 && ${Me.PctHPs} > 70 && ${Me.PctAggro} < 1 && !${Me.CombatState.Equal[COMBAT]} )    /ItemNotify Manastone rightmouseup    
 /if (${Debug}) /echo <== check_Manastone -|
 /RETURN
-|-----------------------------------------------------------|
-|- Uses Manastone whenever nothing else is going on to     -|
-|- bring mana up to 50% while HP is above 70%              -|
-|- A horse is helpful for max rate stone usage             -|
-|- Install Instructions:                                   -|
-|- Add this SUB to the bottom of e3 Includes/e3_Basics.inc -|
-|- Add subroutine check for the appropriate classes        -|
-|- in e3 Macro Inis/Advanced Settings.ini                  -|
-|-  ex:   MAG Function#10=check_JJBoots                    -|
-|-----------------------------------------------------------|
-;SUB check_JJBoots
-;/if (${Debug}) /echo |- check_JJBoots ==>
-;    /if (!${Me.Invis} && ${Bool[${FindItem[=Journeyman's Boots]}]} && ${Bool[${Me.Buff[Journeyman Boots]}]})	{/keypress OPEN_INV_BAGS	/delay 1s
-;	/ItemNotify in pack1 1 rightmouseup
-;	/delay 1s	
-;	/keypress CLOSE_INV_BAGS
-;	/delay 1s}
-;/if (${Debug}) /echo <== check_JJBoots -|
-;/RETURN
 |----------------------------------------------------------------------------|
 |- Whenever nothing else is going on will check if the toon has all the items in the gimme list
 |- only Temporary (NoRent) items can be requested using Gimme
