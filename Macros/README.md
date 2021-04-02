@@ -1,4 +1,4 @@
-<h><b>language.mac/b></h>
+<h><b>language.mac</b></h>
 
 Automate learning languages. Run on several toons in same group at the same time to speed up process.
 
