@@ -2,9 +2,7 @@
 | Wizard Functions
 |----------------------------------------------------------------------------|
 SUB check_Harvest
-	/if (${autoHarvest} && ${Defined[harvestSpells2D]}) {
-    |only harvest if im not in ooc regen
-    /if (${Me.CombatState.Equal[COMBAT]}) {
+    /if (${autoHarvest} && ${Defined[harvestSpells2D]}) {
       /declare s int local
       /for s 1 to ${harvestSpells2D.Size[1]}
         /call check_Ready "harvestSpells2D" ${s}
@@ -15,7 +13,6 @@ SUB check_Harvest
         }
       /if (!${ActionTaken}) /next s
     }
-	}
 /RETURN
 |----------------------------------------------------------------------------|
 Sub WIZ_Setup
