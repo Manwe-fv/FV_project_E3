@@ -2,6 +2,8 @@
 
 MQ2's E3 with fixes and edits custom to the Firiona Vie Project server.
 
+PLEASE NOTE: Due to classic client limitations, some E3 functionality will not work. This is due to a lack of XTargets, visibility of debuffs on mobs, etc. Check issues for a full list.
+
 Download the base version of MQ2+E3 from the link below and apply the files in this repository over them.
 
 Link: https://drive.google.com/open?id=0B4A1w5r540xFbmVTTG5oX01lR0E
