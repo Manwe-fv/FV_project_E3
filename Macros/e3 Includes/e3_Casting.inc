@@ -467,27 +467,6 @@ Sub casting_Setup
 	/declare DefaultGem int outer 8
 	/call iniToVarV "${genSettings_Ini},Casting,Default Spell Gem" DefaultGem int outer
   /call iniToVarV "${genSettings_Ini},Casting,Default Spell Set" Default_SpellSet string outer
-
-  /declare vetArray[8] string outer
-  /declare iLesson    int outer 1
-  |/declare iThrone    int outer 2
-  /declare iArmor     int outer 2
-  /declare iIntensity int outer 3
-  /declare iImfusion  int outer 4
-  /declare iSteadfast int outer 5
-  /declare iStaunch   int outer 6
-  /declare iExpedient int outer 7
-  /declare iJester    int outer 8
-  /varset vetArray[${iLesson}]    "Lesson of the Devoted"
-  |/varset vetArray[${iThrone}]    "Throne of Heroes"
-  /varset vetArray[${iArmor}]     "Armor of Experience"
-  /varset vetArray[${iIntensity}] "Intensity of the Resolute"
-  /varset vetArray[${iImfusion}]  "Infusion of the Faithful"
-  /varset vetArray[${iSteadfast}] "Steadfast Servant"
-  /varset vetArray[${iStaunch}]   "Staunch Recovery"
-  /varset vetArray[${iExpedient}] "Expedient Recovery"
-  /varset vetArray[${iJester}]    "Chaotic Jester"
-  /call BuildSpellArray "vetArray" "vetArray2D"
 /if (${Debug} || ${Debug_Casting}) /echo <== casting_Setup -|
 /return
 
