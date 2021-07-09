@@ -1365,7 +1365,7 @@ SUB assist_CharacterSettings
 	| Add Assist_Stick entries.
 	/call WriteToIni "${Character_Ini},Assist Settings,Assist Type (Melee/Ranged/Off)" ${If[${Select[${Me.Class.ShortName},BRD,BER,BST,MNK,PAL,RNG,ROG,SHD,WAR]},Melee,Off]}
   | Default Tanks to Front
-  /if (${Select[${Me.Class.ShortName},PAL,SHD,WAR]}) {
+  /if (${Select[${Me.Class.ShortName},PAL,SHD,WAR,RNG]}) {
     /call WriteToIni "${Character_Ini},Assist Settings,Melee Stick Point" Front
     /call WriteToIni "${Character_Ini},Assist Settings,Taunt(On/Off)" Off
     /call WriteToIni "${Character_Ini},Assist Settings,SmartTaunt(On/Off)" On
