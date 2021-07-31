@@ -1759,3 +1759,248 @@ SUB check_Gimme
 	}
 	/if (${Debug}) /echo <== check_Gimme -|
 /RETURN
+|------------------------------------------------------------------------|
+|- LinkLoot event 
+|- Written by Psychosis of Project Lazarus								
+|- Additional help from Grok and Kreegoth								
+|- e3 integration by Sirhopsalot
+|- Install Instructions:   
+|- Place this function in e3_Basics.inc
+|- add /doevents LinkLoot to basics_Background_Events in e3_Basics.inc
+|- Usage:
+|- /bc LinkLoot bag channel
+|- /bc LinkLoot 1 2 // this would link all contents of bag 1 to Raid
+|- Alias Shortcut:
+|- /alias /LinkLoot /bc LinkLoot 
+|- Alias Usage: /LinkLoot 1 1
+|------------------------------------------------------------------------|
+#EVENT LinkLoot "<#1#> LinkLoot #2# #3#"
+SUB EVENT_LinkLoot(line, chatSender, bag, channel)
+	/declare DebugLinkLoot bool local false
+
+	/if (${chatSender.Equal[${Me.Name}]} == FALSE) {
+		/if (${DebugLinkLoot}) /echo {chatSender.Equal[${Me.Name}]} = ${chatSender.Equal[${Me.Name}]}
+		/return
+	}
+
+	/if (!${bag}) {
+		/Echo Example Usage: /mac lootlink 1 2 -- This would link all contents of bag 1, to RAID
+		/Echo Example Usage: The first is your bag number, the second is your channel output number
+		/Echo Channel List: 1=Group, 2=Raid, 3=Guild
+		/return
+	}
+
+	/if (${DebugLinkLoot}) /echo {bag} = ${bag}
+	/if (${DebugLinkLoot}) /echo {channel} = ${channel}
+
+	/declare Bag int ${bag}
+	/declare Channel string ${channel}
+	/declare varname int local
+	/declare itemlist string local
+	/declare itemlist_stack string local
+	/for varname 1 to ${InvSlot[pack${Bag}].Item.Container}
+		/if (${InvSlot[pack${Bag}].Item.Item[${varname}].ID}) {
+			/varset itemlist ${itemlist}${LinkDB[${InvSlot[pack${Bag}].Item.Item[${varname}]}]}|
+			/varset itemlist_stack ${itemlist_stack}${InvSlot[pack${Bag}].Item.Item[${varname}].Stack}|
+		}
+	/next varname
+	/declare a int 1
+	/declare b ${itemlist.Count[|]}	
+	/if (${DebugLinkLoot}) /echo {itemlist.Count[|]} = ${itemlist.Count[|]}
+
+	/if (${Channel} == 1) {
+		/if (${b} == 10) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/g ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]} - ${itemlist_stack.Token[9,"|"]}x ${itemlist.Token[9,"|"]}
+			/g ${itemlist_stack.Token[10,"|"]}x ${itemlist.Token[10,"|"]}
+			/g ----
+		} else /if (${b} == 9) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/g ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]} - ${itemlist_stack.Token[9,"|"]}x ${itemlist.Token[9,"|"]}
+			/g ----
+		} else /if (${b} == 8) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/g ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]}
+			/g ----
+		} else /if (${b} == 7) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/g ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]}
+			/g ----
+		} else /if (${b} == 6) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/g ----
+		} else /if (${b} == 5) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]}
+			/g ----
+		} else /if (${b} == 4) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]}
+			/g ----
+		} else /if (${b} == 3) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/g ----
+		} else /if (${b} == 2) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]}
+			/g ----
+		} else /if (${b} == 1) {
+			/bc Linking Bag [#${Bag}] to Group
+			/g -- ITEMS IN BAG [#${Bag}] --
+			/g	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]}
+			/g ----
+		}
+	}
+	/if (${Channel} == 2) {
+		/if (${b} == 10) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/rs ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]} - ${itemlist_stack.Token[9,"|"]}x ${itemlist.Token[9,"|"]}
+			/rs ${itemlist_stack.Token[10,"|"]}x ${itemlist.Token[10,"|"]}
+			/rs ----
+		} else /if (${b} == 9) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/rs ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]} - ${itemlist_stack.Token[9,"|"]}x ${itemlist.Token[9,"|"]}
+			/rs ----
+		} else /if (${b} == 8) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/rs ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]}
+			/rs ----
+		} else /if (${b} == 7) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/rs ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]}
+			/rs ----
+		} else /if (${b} == 6) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/rs ----
+		} else /if (${b} == 5) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]}
+			/rs ----
+		} else /if (${b} == 4) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]}
+			/rs ----
+		} else /if (${b} == 3) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/rs ----
+		} else /if (${b} == 2) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]}
+			/rs ----
+		} else /if (${b} == 1) {
+			/bc Linking Bag [#${Bag}] to Raid
+			/rs -- ITEMS IN BAG [#${Bag}] --
+			/rs	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]}
+			/rs ----
+		}
+	}
+	/if (${Channel} == 3) {
+		/if (${b} == 10) {	
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/gu ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]} - ${itemlist_stack.Token[9,"|"]}x ${itemlist.Token[9,"|"]}
+			/gu ${itemlist_stack.Token[10,"|"]}x ${itemlist.Token[10,"|"]}
+			/gu ----
+		} else /if (${b} == 9) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/gu ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]} - ${itemlist_stack.Token[9,"|"]}x ${itemlist.Token[9,"|"]}
+			/gu ----
+		} else /if (${b} == 8) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/gu ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]} - ${itemlist_stack.Token[8,"|"]}x ${itemlist.Token[8,"|"]}
+			/gu ----
+		} else /if (${b} == 7) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/gu ${itemlist_stack.Token[7,"|"]}x ${itemlist.Token[7,"|"]}
+			/gu ----
+		} else /if (${b} == 6) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]} - ${itemlist_stack.Token[6,"|"]}x ${itemlist.Token[6,"|"]}
+			/gu ----
+		} else /if (${b} == 5) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]} - ${itemlist_stack.Token[5,"|"]}x ${itemlist.Token[5,"|"]}
+			/gu ----
+		} else /if (${b} == 4) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ${itemlist_stack.Token[4,"|"]}x ${itemlist.Token[4,"|"]}
+			/gu ----
+		} else /if (${b} == 3) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]} - ${itemlist_stack.Token[3,"|"]}x ${itemlist.Token[3,"|"]}
+			/gu ----
+		} else /if (${b} == 2) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]} - ${itemlist_stack.Token[2,"|"]}x ${itemlist.Token[2,"|"]}
+			/gu ----
+		} else /if (${b} == 1) {
+			/bc Linking Bag [#${Bag}] to Guild
+			/gu -- ITEMS IN BAG [#${Bag}] --
+			/gu	${itemlist_stack.Token[1,"|"]}x ${itemlist.Token[1,"|"]}
+			/gu ----
+		}
+	}
+/RETURN
