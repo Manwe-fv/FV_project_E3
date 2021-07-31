@@ -1584,6 +1584,7 @@ Sub basics_Background_Events
   /doevents macroHelp
   /doevents exp_group
   /doevents campdesktop
+  /doevents LinkLoot
 |		/varset event_counter 1
 |	} else {
 |		/varcalc event_counter ${event_counter}+1
