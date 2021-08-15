@@ -68,6 +68,15 @@ SUB EVENT_syncInventory
 SUB EVENT_sellItems
 /if (${Debug} || ${Debug_Sell}) /echo |- EVENT_sellItems ==>
 	
+	    | Stop Bardswap
+    /declare bsstat bool local false
+    /if (${BardSwap.Swapping}) {
+            /BardSwap
+            /BardSwap melee
+            /varset bsstat true
+        }
+    }
+	
 	| Record starting location.
 	/declare startingLoc string local ${Me.Loc.Replace[ ,]}
 		
@@ -99,6 +108,13 @@ SUB EVENT_sellItems
 		
 		/echo I have finished selling.
 	}
+	
+		    | Restart Bardswap
+    /if (${bsstat}) {
+        /Bardswap
+        /BardSwap melee
+    }
+	
 	
 /if (${Debug} || ${Debug_Sell}) /echo <== EVENT_sellItems -|
 /RETURN
