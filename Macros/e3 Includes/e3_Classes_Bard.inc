@@ -229,6 +229,11 @@ Sub BRD_Setup
   /declare songSet string outer
   /declare resumeTwistDelay timer outer
 
+  /if (!${BardSwap}) {
+    /bardswap
+    /bardswap melee
+  }
+	
   /if (${Defined[mezArray]}) {
     /call BuildSpellArray "mezArray"	"mezArray2D"
   } else {
