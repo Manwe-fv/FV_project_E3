@@ -26,6 +26,7 @@ SUB DRU_MacroSettings
 	/call WriteToIni "${advSettings_Ini},DRU Functions,DRU Function#7" "check_DoTs" 1
 	/call WriteToIni "${advSettings_Ini},DRU Functions,DRU Function#8" "check_AE" 1
 	/call WriteToIni "${advSettings_Ini},DRU Functions,DRU Function#9" "check_Nukes" 1
+	/call WriteToIni "${advSettings_Ini},DRU Functions,DRU Function#10" "check_Charm" 1
 /RETURN
 |----------------------------------------------------------------------------|
 SUB DRU_CharacterSettings
