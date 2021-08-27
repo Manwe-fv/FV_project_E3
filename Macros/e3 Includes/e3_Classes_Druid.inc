@@ -72,9 +72,9 @@ sub Event_AE_FOE(string line)
 	}
 /return
 |----------------------------------------------------------------------------|
-#event charmOn "<#1#> Charm on #2#"
-#event charmOn "#1# tells you, 'Charm on #2#'"
-sub event_charmOn(line, ChatSender, targetID)
+#event druid_charmOn "<#1#> Charm on #2#"
+#event druid_charmOn "#1# tells you, 'Charm on #2#'"
+sub event_druid_charmOn(line, ChatSender, targetID)
   /if (${Me.Class.ShortName.Equal[DRU]}) {
     /if (${Debug} || ${Debug_Ench}) /echo |-  charmOn ==>
     |&& (!${Spawn[id ${targetID}].Named} || ${Spawn[id ${targetID}].CleanName.Equal[Coerced Lieutenant]})
@@ -89,9 +89,9 @@ sub event_charmOn(line, ChatSender, targetID)
   }
 /return
 |----------------------------------------------------------------------------|
-#event charmOff "<#1#> Charm Off"
-#event charmOff "#1# tells you, 'Charm Off'"
-sub event_charmOff(line, ChatSender)
+#event druid_charmOff "<#1#> Charm Off"
+#event druid_charmOff "#1# tells you, 'Charm Off'"
+sub event_druid_charmOff(line, ChatSender)
 /if (${Debug} || ${Debug_Ench}) /echo |- charmOff ==>
   /if (${Me.Class.ShortName.Equal[DRU]}) {
       /if (${doCharm}) {
@@ -178,6 +178,6 @@ Sub DRU_Background_Events
 	/doevents AE_SOW
 	/doevents AE_FOE
     /doevents charmTarget
-    /doevents charmOn
-    /doevents charmOff
+    /doevents druid_charmOn
+    /doevents druid_charmOff
 /return
