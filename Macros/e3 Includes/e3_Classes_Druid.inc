@@ -3,7 +3,16 @@
 |----------------------------------------------------------------------------|
 Sub DRU_Setup
 	/call iniToVarV "${Character_Ini},Druid,Evac Spell" Evac_Spell string outer
-    /call IniToArrayV "${Character_Ini},Druid,Charm#"	charmArray
+  /call IniToArrayV "${Character_Ini},Druid,Charm#"	charmArray
+  
+  /declare charmTarget int outer
+  /if (${Bool[${charmArray.Size}]}) {
+    /call BuildSpellArray "charmArray"	"charmArray2D"
+    /declare doCharm bool outer TRUE
+    /declare charmBuffTimer timer outer
+  } else {
+    /declare doCharm bool outer FALSE
+  }
 /return
 |----------------------------------------------------------------------------|
 SUB DRU_MacroSettings
