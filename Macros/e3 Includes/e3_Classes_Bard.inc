@@ -251,14 +251,115 @@ Sub BRD_Setup
 /if (${Debug}) /echo <== BRD_Setup -|
 /return
 |--------------------------------------------------------------|
+#event brdCharmOn "<#1#> Charm on #2#"
+#event brdCharmOn "#1# tells you, 'Charm on #2#'"
+sub event_brdCharmOn(line, ChatSender, targetID)
+  /if (${Me.Class.ShortName.Equal[ENC]} || ${Me.Class.ShortName.Equal[BRD]}) {
+    /if (${Debug} || ${Debug_Ench}) /echo |-  charmOn ==>
+    |&& (!${Spawn[id ${targetID}].Named} || ${Spawn[id ${targetID}].CleanName.Equal[Coerced Lieutenant]})
+      /if ((${Spawn[id ${targetID}].Distance} < 240 && ${Spawn[id ${targetID}].Level} <= ${Me.Level} && ${SpawnCount[npc id ${targetID}]}>0) || ${targetID}==${Me.Pet.ID}) {
+        /varset charmTarget ${targetID}
+        /varset doCharm TRUE
+        /docommand ${ChatToggle} << Charm enabled ${Spawn[id ${charmTarget}].CleanName} >>
+      } else {
+        /docommand ${ChatToggle} << ${Spawn[id ${targetID}].CleanName} is not eligible for charm >>
+      }
+    /if (${Debug}) /echo <== charmOn -|
+  }
+/return
+|----------------------------------------------------------------------------|
+#event brdCharmOff "<#1#> Charm Off"
+#event brdCharmOff "#1# tells you, 'Charm Off'"
+sub event_brdCharmOff(line, ChatSender)
+/if (${Debug} || ${Debug_Ench}) /echo |- charmOff ==>
+  /if (${Me.Class.ShortName.Equal[ENC]} || ${Me.Class.ShortName.Equal[BRD]}) {
+      /if (${doCharm}) {
+        /docommand ${ChatToggle} << Charm Disabled ${Spawn[id ${charmTarget}].CleanName} >>
+        /varset doCharm FALSE
+        /varset charmTarget 0
+      }
+    /if (${Debug}) /echo <== charmOff -|
+  }
+/return
+|----------------------------------------------------------------------------|
+Sub check_charm
+/if (${Debug} || ${Debug_Ench}) /echo |- check_Charm ==>
+/if (${Defined[charmArray2D]}) {
+  /declare s int local
+  /declare charmDuration int local
+  /if (${doCharm} && ${Bool[${charmTarget}]}) {
+    /if (${SpawnCount[npc id ${charmTarget}]}==0 && ${charmTarget}!=${Me.Pet.ID}) {
+      /docommand ${ChatToggle} Disabling Charm: ${charmTarget} is no longer a valid npc
+      /varset doCharm FALSE
+      /varset charmTarget 0
+      /return
+    }
+    /if (${Me.Pet.Race.Name.Equal[Invisible Man]}) {
+      /pet get lost
+      /delay 1s !${Me.Pet.ID}
+    }
+    /if (!${Bool[${Me.Pet.ID}]}) {
+      /bc [+r+] << ${Spawn[id ${charmTarget}].CleanName} is not Charmed! >> [+r+]
+      /for s 1 to ${charmArray2D.Size[1]}
+      /call check_Ready "charmArray2D" ${s}
+      /if (${c_Ready}) {
+        /if (${check_Mana["charmArray2D",${s}]}) {
+          /if (${check_Distance[${charmTarget},${charmArray2D[${s},${iMyRange}]}]}) {
+            /docommand ${ChatToggle} << Charming ${charmTarget} ${Spawn[id ${charmTarget}].CleanName} with ${charmArray2D[${s},${iCastName}]} >>
+            /call e3_Cast ${charmTarget} "charmArray2D" "${s}"
+            /if (${Bool[${Me.Pet.ID}]}) {
+              /bc [+g+] >> Charmed ${Spawn[id ${charmTarget}].CleanName} <<
+              /timed 5 /pet back off
+              /timed 10 /pet follow
+            } else {
+              /if (${castReturn.Equal[CAST_IMMUNE]}) {
+                /varset doCharm FALSE
+                /varset charmTarget 0
+                /docommand ${ChatToggle} << ${Spawn[id ${charmTarget}].CleanName} is immune, turning off charm >>
+              }
+            }
+          }
+        }
+      }
+      /if (!${Bool[${Me.Pet.ID}]}) /next s
+    } else {
+    |accounce time left on charm
+      /for s 1 to ${charmArray2D.Size[1]}
+        /if (${Bool[${Me.PetBuff[${charmArray2D[${s},${iSpellName}]}]}]}) {
+          /varset charmDuration ${Pet.BuffDuration[${charmArray2D[${s},${iSpellName}]}].TotalSeconds}
+          |/echo charmduration ${charmDuration} timer ${charmBuffTimer}
+          /if (${charmDuration} > 60) {
+            /if (!${Bool[${charmBuffTimer}]}) {
+              /bc [+g+] My charm fades in ${charmDuration} sec
+              /varset charmBuffTimer 18s
+            }
+          } else /if (${charmDuration} <= 60 && ${charmDuration} > 9) {
+            /if (!${Bool[${charmBuffTimer}]}) {
+              /bc [+y+] My charm fades in ${charmDuration} sec
+              /varset charmBuffTimer 6s
+            }
+          } else /if (${charmDuration} <= 9) {
+            /if (!${Bool[${charmBuffTimer}]}) {
+              /bc [+r+] My charm fades in ${charmDuration} sec
+              /varset charmBuffTimer 1s
+              }
+          }
+        }
+      /next s
+    }
+  }
+}
+/if (${Debug} || ${Debug_Ench}) /echo <== check_Charm -|
+/return
+|----------------------------------------------------------------------------|
 Sub BRD_Background_Events
   /if (${returnTwist} && !${Bool[${Me.Casting}]} && !${Twist.Twisting} && !${resumeTwistDelay}) /call unpauseTwist
 	/doevents saveMelody
 	/doevents startMelody
   /doevents charmTarget
   /doevents toggleMez
-  /doevents charmOn
-  /doevents charmOff
+  /doevents brdCharmOn
+  /doevents brdCharmOff
 /return
 |--------------------------------------------------------------|
 SUB BRD_MacroSettings
