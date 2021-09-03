@@ -27,7 +27,7 @@ SUB summonPet
     /return
   }
   /call check_Ready "petSpell2D" 1
-  /if (${c_Ready}) {
+  /if (${c_Ready} && ${petSpell2D[1,${iIfs}]}) {
     /if (${check_Mana["petSpell2D",1]}) {
 	    /call e3_Cast ${Me.ID} "petSpell2D" 1
     }
