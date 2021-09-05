@@ -26,12 +26,15 @@ SUB summonPet
     /call check_Zone
     /return
   }
-  /call check_Ready "petSpell2D" 1
-  /if (${c_Ready} && ${petSpell2D[1,${iIfs}]}) {
-    /if (${check_Mana["petSpell2D",1]}) {
-	    /call e3_Cast ${Me.ID} "petSpell2D" 1
+  /declare s int local
+  /for s 1 to ${petSpell2D.Size[1]}
+  /call check_Ready "petSpell2D" ${s}
+  /if (${c_Ready} && ${petSpell2D[${s},${iIfs}]}) {
+    /if (${check_Mana["petSpell2D",${s}]}) {
+	    /call e3_Cast ${Me.ID} "petSpell2D" ${s}
     }
   }
+  /next s
   /if (${Me.Pet.ID} && ${petTaunt}) {
     /pet taunt on
   } else {
