@@ -390,6 +390,13 @@ SUB loot_Setup
 		/declare Loot_Ini string outer ${Ini[${MacroData_Ini},File Paths,Loot Settings File]}
 	}
 
+  /call iniToVarV "${Character_Ini},Loot,Loot Specific Toon File" toonSpecificLootFile bool outer
+  /if (${toonSpecificLootFile}) {
+    /varset Loot_Ini "e3 Bot Inis\${Me.CleanName}_Loot.ini"
+  }
+
+  /if (${Debug} || ${Debug_Loot}) /echo |- Loot_Ini => <${Loot_Ini}>
+
   /declare fullInventory_Alert bool outer FALSE
   /declare canLootCorpse bool outer FALSE
   /declare cantLootCorpseCount int outer FALSE
@@ -411,6 +418,7 @@ SUB loot_MacroSettings
 	/call WriteToIni "${genSettings_Ini},Loot,Loot Link Channel" say
 	/call WriteToIni "${genSettings_Ini},Loot,Corpse Seek Radius" 125
   /call WriteToIni "${genSettings_Ini},Loot,Loot in Combat" TRUE
+  /call WriteToIni "${Character_Ini},Loot,Loot Specific Toon File" TRUE
 /if (${Debug}) /echo <== _MacroSettings -|
 /RETURN
 
