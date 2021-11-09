@@ -396,14 +396,14 @@ SUB set_NextHealer
 		/if (${Math.Distance[${Spawn[pc ${Chain_Target}].Loc.Replace[ ,]}:${Spawn[pc ${Chain_MemberList.Arg[${e},,]}].Loc.Replace[ ,]}]} < 100) {
 			| If the healer is in zone, and in range, set next healer
 			/varset nextHealer ${Chain_MemberList.Arg[${e},,]}
-		} else {
-			/echo ${Spawn[pc ${Chain_MemberList.Arg[${e},,]}].CleanName} is out of range, checking for another healer...
-			/next i
+			| Healer found so exit for loop
+			/break
 		}
+		/echo ${Spawn[pc ${Chain_MemberList.Arg[${e},,]}].CleanName} is out of range, checking for another healer...
 	} else {
 		/if (${Debug} || ${Debug_HealChain}) /echo [${Chain_MemberList.Arg[${e},,]}] is not in zone!
-		/next i
 	}
+	/next i
 /if (${Debug} || ${Debug_HealChain}) /echo <== set_Healer -|
 /RETURN ${nextHealer}
 
