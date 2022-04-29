@@ -283,7 +283,7 @@ SUB CombatAbilities
       /goto :skipAbility
     }
     /if (${Abilities2D[${i},${iCastType}].Equal[Ability]}) {
-      if (${Abilities2D[${i},${iCastName}].Equal[Bash]}) {
+      /if (${Abilities2D[${i},${iCastName}].Equal[Bash]}) {
         /if (!${Select[${Me.Inventory[Offhand].Type},Shield]} && !${Me.AltAbility[2 Hand Bash]} && !${Select[${Me.Inventory[13]},Fiery Avenger,Fiery Defender,Innoruuk's Curse]}) /goto :skipAbility
       }
       /if (${Me.AbilityReady[${Abilities2D[${i},${iCastName}]}]}) {
