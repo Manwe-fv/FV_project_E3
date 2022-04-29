@@ -11,7 +11,7 @@ SUB check_Buffs
 		/if (!${combatTimer} && ${Me.CombatState.NotEqual[COMBAT]} && !${Assisting} && !${Me.Moving} && ${BuffCheck}) {
 			/if (${Defined[SelfBuffs2D]}) /call buffBots "SelfBuffs2D"
 			/if (${Defined[BotBuffs2D]})	/call buffBots "BotBuffs2D"
-      /if (${Defined[auraSpells2D]}) /call checkAuras
+|      /if (${Defined[auraSpells2D]}) /call checkAuras
 		}
 	}
 	/if (${Debug} || ${Debug_BuffCheck}) /echo <== buffCheck -|
