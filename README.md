@@ -1,12 +1,14 @@
-# FV_project_E3
+# FVPE3
 
-MQ2's E3 with fixes and edits custom to the Firiona Vie Project server.
+An update to E3 that allows usage on the latest Macroquest Emu builds and includes edits custom to the Firiona Vie Project server.
 
 PLEASE NOTE: Due to classic client limitations, some E3 functionality will not work. This is due to a lack of XTargets, visibility of debuffs on mobs, etc. Check issues for a full list.
 
-Download the base version of MQ2+E3 from the link below and apply the files in this repository over them.
+Download this version of Macroquest from the link below.
 
 Link: https://drive.google.com/open?id=0B4A1w5r540xFbmVTTG5oX01lR0E
+
+Apply the files found in this repository to the Macroquest folder.
 
 The comprehensive E3 guide can be found here: https://docs.google.com/document/d/1mZMuB3QGwjAwjpxe-SMN13u6zM-lox7IQPkJTQDomWo/edit#
 
