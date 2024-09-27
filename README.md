@@ -4,9 +4,9 @@ An update to E3 that allows usage on the latest Macroquest Emu builds and includ
 
 PLEASE NOTE: Due to classic client limitations, some E3 functionality will not work. This is due to a lack of XTargets, visibility of debuffs on mobs, etc. Check issues for a full list.
 
-Download this version of Macroquest from the link below.
+Download the EMu version of Macroquest from the link below.
 
-Link: https://drive.google.com/open?id=0B4A1w5r540xFbmVTTG5oX01lR0E
+Link: https://drive.google.com/file/d/1-9KYIOkIX59M_51baDnPYMJNIvCJD9X6/view?usp=sharing
 
 Apply the files found in this repository to the Macroquest folder.
 
