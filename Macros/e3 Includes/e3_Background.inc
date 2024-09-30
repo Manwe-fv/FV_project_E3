@@ -64,7 +64,7 @@ SUB check_Follow
       /declare followTgtDistance float local ${Spawn[=${FollowTarget}].Distance}
       /declare followTgtLoS bool local ${Spawn[=${FollowTarget}].LineOfSight}
       /if (${followTgtDistance} <= ${LeashLength}) {
-        /if (!${NetAdvPath.Status} && !${Stick.Active}) {
+        /if (!${AdvPath.Status} && !${Stick.Active}) {
           /if (${followTgtDistance}< 40 && ${medBreak}) {
             /if (${Debug} || ${Debug_Background}) /echo not following during medbreak and < 40 dist
           } else {
@@ -75,7 +75,7 @@ SUB check_Follow
         |FollowCheckTimer
       } else /if (${followTgtDistance} > ${LeashLength}) {
         /if (!${FollowCheckTimer}) {
-          /if (!${NetAdvPath.Status} && !${Stick.Active}) {
+          /if (!${AdvPath.Status} && !${Stick.Active}) {
             /bct ${FollowTarget} //popup ${Me} stopped moving! Dist:${followTgtDistance},LoS:${followTgtLoS}
           } else {
             /bct ${FollowTarget} //popup ${Me} is falling behind. Dist:${followTgtDistance},LoS:${followTgtLoS}
@@ -106,37 +106,57 @@ SUB check_Idle
   /if (${Debug}) /echo <== check_Idle -| idleTimer = [${idleTimer}] || idle = [${idle}]
 /RETURN
 
+
+SUB check_ClearCursor
+    |Lets check our cursor, as having something on our cursor and casting spells can .. cause issues.
+    |main thing we want to check for is Azure Mind Crystals, Sanguine Crystals, Molten orbs, Large modulation shards
+    /if (${Bool[${Cursor.ID}]}) {
+      /if ((${Cursor.Name.Equal[Azure Mind Crystal III]} ||${Cursor.Name.Equal[Summoned: Large Modulation Shard]} || ${Cursor.Name.Equal[Sanguine Mind Crystal III]} )) {
+        |new charges, lets get inventoried
+        /if (${Cursor.Charges}==3) {
+          /call ClearCursor
+        }
+      } else /if (${Cursor.Name.Equal[Molten orb]} || ${Cursor.Name.Equal[Lava orb]}) {
+         |new charges, lets get inventoried
+        /if (${Cursor.Charges}==10) {
+          /call ClearCursor
+        }
+      }
+    } 
+/return
 |--------------------------------------------------------------------------------------------|
 |- Checks to see if your character is active, if so pauses macro loop                       -|
 |--------------------------------------------------------------------------------------------|			
 SUB check_Active
 /if (${Debug} || ${Debug_Background}) /echo |- check_Active ==>
 	| Check Cursor
-	/if (${Cursor.ID}) {	
-		| Destroy badItems.
-		/if (${Defined[badItems]}) {
-			/if (${Select[${Cursor},${badItems}]} || ${Select[${Cursor.ID},${badItems}]}) {
-				/echo Destroying ${Cursor}...
-				/destroy
-			}
-		}
-		| Check to see if I'm waiting to drop this item, or if I've picked up something new
-		/if (${Old_cursorID} != ${Cursor.ID}) {
-			/varset cursorTimer ${Math.Calc[${inventoryTimer} * 10].Int}
-			/varset Old_cursorID ${Cursor.ID}
-		} else {
-			/if (!${cursorTimer}) /call clearCursor
-		}		
-		/varset activeTimer 5
-	} else {
-		/if (${Old_cursorID}) {
-			/varset cursorTimer 0
-			/varset Old_cursorID 0
-		}
-	}
-
+	  
+    /if (${Cursor.ID}) {	
+        | Destroy badItems.
+        /if (${Defined[badItems]}) {
+          /if (${Select[${Cursor},${badItems}]} || ${Select[${Cursor.ID},${badItems}]}) {
+            /echo [${Time}] Destroying ${Cursor}...
+            /destroy
+          }
+        }
+    
+        |this is the 30 sec timer. If you have something on your cursor for 30 seconds, it will kick it off.
+        /if (${Old_cursorID} != ${Cursor.ID}) {
+          /varset cursorTimer ${Math.Calc[${inventoryTimer} * 10].Int}
+          /varset Old_cursorID ${Cursor.ID}
+        } else {
+          /if (!${cursorTimer}) /call ClearCursor
+        }		
+        
+    } else {
+      /if (${Old_cursorID}) {
+        /varset cursorTimer 0
+        /varset Old_cursorID 0
+      }
+    }
+  
   |prevent guys from getting stuck trying to buff while moving
-	/if (${Me.Moving}) {
+	/if (${Me.Moving} && !${Me.Class.ShortName.Equal[BRD]}) {
 	  /if (${Me.CombatState.Equal[COMBAT]}) {
       /varset activeTimer 2
       /varset rebuffTimer 10
@@ -176,8 +196,8 @@ SUB check_Active
 
 |------------------------------------------------------------|
 |- loot, check exp allocation, announce exp	-|
-#event YourKill "You gain experience!!"
-#event YourKill "You gain party experience!!"
+#event YourKill "You have gained #*#"
+#event YourKill "#*# party experience!"
 #event YourKill "You gained raid experience!"
 SUB Event_YourKill(line)
   /if (!${line.Find[raid]}) {
@@ -196,7 +216,7 @@ SUB Event_YourKill(line)
       /bc [+y+] Auto setting AA Exp to 100%, at ${Me.PctExp}% of Level ${Me.Level}
     }
   }
-  /if (${Auto_Loot} && (${Me.CombatState.NotEqual[Combat]} || ${combatLooting})) /call loot_Area
+  /if (${Auto_Loot} && (${Me.CombatState.NotEqual[Combat]} && ${SpawnCount[xtarhater radius 100]} == 0 || ${combatLooting})) /call loot_Area
 /RETURN
 
 |----------------------------------------------------------------------------------------------------|

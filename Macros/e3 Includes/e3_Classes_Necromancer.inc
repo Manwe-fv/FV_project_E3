@@ -1,11 +1,72 @@
 |----------------------------------------------------------------------------|
 | Necromancer Functions
 |----------------------------------------------------------------------------|
+
+
+SUB check_NecroAggro
+
+  /if (${Me.Feigning}) /return
+  /if (!${Assisting}) /return  
+  /if (${Bool[${Me.Song[Harm Shield]}]}) /return
+  /if (${Bool[${Me.Song[Embalmer's Carapace]}]}) /return
+ 
+
+  |update our max agro on xtargets
+  /declare i int local 1
+  /declare aggroCap int local 90
+  /declare tempMaxAggro int local 0
+  /declare currentAggro int local 0
+  /declare mobId int local 0
+  |first we do a quick max agro check
+  /for i 1 to 13
+  /if (!${Me.XTarget[${i}].TargetType.Equal[Auto Hater]}) /continue
+    /varset mobId ${Me.XTarget[${i}].ID}
+    /if (!${Bool[${mobId}]}) /continue
+    /if (${mobId}<1) /continue
+    /if (!${Spawn[npc id ${mobId}].Aggressive}) /continue
+    |try and avoid xtarget bug by checking to make sure this isn't a corpse before we access the aggro
+    /if (${Spawn[npc id ${mobId}].Type.Equal[Corpse]}) /continue
+    /varset currentAggro ${Me.XTarget[${i}].PctAggro}
+    /if (${tempMaxAggro} <  ${currentAggro}) {
+      /varset tempMaxAggro ${currentAggro}
+    }
+  /next i
+  /if (${tempMaxAggro} > ${aggroCap} && !${Bool[${Me.Song[Gathering Dusk]}]}) {
+    /bc [+g+] [${Time}]  <check_FD> agro is high, calling Death Peace for ${Me.Name}
+    /call check_ReadySimple "Improved Death Peace"
+    /if (${c_Ready}) {
+        /call castSimpleSpell "Improved Death Peace" 0
+        /stand
+        /return
+    }
+    /call check_ReadySimple "Death Peace"
+    /if (${c_Ready}) {
+        /call castSimpleSpell "Death Peace" 0
+        /stand
+        /return
+    }
+  }
+  /if (${tempMaxAggro} > ${aggroCap}) {
+
+      /call check_ReadySimple "Harmshield"
+      /if (${c_Ready}) {
+        /call castSimpleSpell "Harmshield" 0
+        /return
+       }
+      /call check_ReadySimple "Embalmer's Carapace"
+      /if (${c_Ready}) {
+        /call castSimpleSpell "Embalmer's Carapace" 0
+        /return
+       }
+  }
+
+/return
+
 SUB check_Lich
   /if (${Debug}) /echo |- check_castLich ==>
   |/echo in checklich  ${lichSpell2D[1,${iMinHP}]}, ${Me.PctHPs} ${Me.Buff[${lichSpell2D[1,${iSpellName}]}]}
   /if (${Defined[lichSpell2D]}) {
-    /if (${Me.PctHPs} <= 10) {
+    /if (${Me.PctHPs} <= 25 || ${lichSpell2D[1,${iMinHP}]} >= ${Me.PctHPs}) {
       /if (${Bool[${Me.Buff[${lichSpell2D[1,${iSpellName}]}]}]}) {
         /echo Removing Lich due to low HP
         /removebuff ${lichSpell2D[1,${iSpellName}]}
@@ -38,22 +99,26 @@ SUB check_manaDump
     /declare s int local
 
     /for s 1 to ${manaDump_Spells2D.Size[1]}
+ /if (${manaDump_Spells2D.Size[1]}==0) /break
       /call check_Ready "manaDump_Spells2D" ${s}
       /if (${c_Ready}) {
         /if (${check_Mana["manaDump_Spells2D",${s}]}) {
       		/varset manaDumpSpellIndex ${s}
 				}
 			}
-    /if (${manaDumpSpellIndex}==0) /next s
+    /if (${manaDumpSpellIndex}!=0) /break
+    /next s
 
     /if (${manaDumpSpellIndex} > 0 ) {
       /for i 1 to ${whoto_manaDump.Size}
+ /if (${whoto_manaDump.Size}==0) /break
         /if (${check_Distance[${NetBots[${whoto_manaDump[${i}].Arg[1,/]}].ID},${manaDump_Spells2D[${manaDumpSpellIndex},${iMyRange}]}]}) {
         	/if (${NetBots[${whoto_manaDump[${i}].Arg[1,/]}].PctMana} <= ${whoto_manaDump[${i}].Arg[2,/]}) {
           	/call e3_Cast ${NetBots[${whoto_manaDump[${i}].Arg[1,/]}].ID} "manaDump_Spells2D" ${manaDumpSpellIndex}
           }
 				}
-			/if (!${ActionTaken}) /next i
+			/if (${ActionTaken}) /break
+ /next i
     }
   }
 /if (${Debug}) /echo <== check_manaDump -|
@@ -65,12 +130,8 @@ sub Event_AE_DMF(string line)
 /if (${Me.Class.ShortName.Equal[NEC]}) {
    /if (${Me.AltAbilityReady[Mass Group Buff]} && ${Bool[${Me.Book[Dead Men Floating]}]}) {
      /bc MGB Dead Men Floating inc...
-     /casting "Mass Group Buff|alt" "-maxtries|3"
-     /delay 5 !${Me.AltAbilityReady[Mass Group Buff]}
-     /delay 5
-     /casting "Dead Men Floating" "-maxtries|3"
-     /delay 5 !${Me.SpellReady[Dead Men Floating]}
-     /casting "Dead Men Floating" "-maxtries|3"
+     /call castSimpleSpell "Mass Group Buff" 0
+     /call castSimpleSpell "Dead Men Floating" 0
      /rs MGB Dead Men Floating inc...
    } else /if (!${Me.AltAbilityReady[Mass Group Buff]}) {
       /bc Mass Group Buff is not available...
@@ -106,6 +167,7 @@ SUB NEC_MacroSettings
 	/call WriteToIni "${advSettings_Ini},NEC Functions,NEC Function#8" "check_Nukes" 1
 	/call WriteToIni "${advSettings_Ini},NEC Functions,NEC Function#9" "check_Buffs" 1
 	/call WriteToIni "${advSettings_Ini},NEC Functions,NEC Function#10" "check_Pets" 1
+  /call WriteToIni "${advSettings_Ini},NEC Functions,NEC Function#11" "check_Food" 1
 /if (${Debug}) /echo <== NEC_MacroSettings -|
 /return
 |----------------------------------------------------------------------------|

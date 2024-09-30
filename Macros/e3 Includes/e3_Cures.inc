@@ -14,15 +14,18 @@ Sub check_Cures
   /if (${autoRCure} && ${doRadiantCure} && ${Me.AltAbilityReady[Radiant Cure]}) {
     /if (${Debug} || ${Debug_Cures}) /echo Checking Rcures
     /for t 1 to ${rCure2D.Size[1]}
+ /if (${rCure2D.Size[1]}==0) /break
       /varset numSick 0
       /for n 0 to ${Group}
+        /if (${Group}==0) /break
         /if (${SpawnCount[pc =${Group.Member[${n}]}]} && ${NetBots[${Group.Member[${n}]}].Counters}>0) {
           /if (${Bool[${Group.Member[${n}].Distance}]} && ${Group.Member[${n}].Distance} < ${rCure2D[${t},${iMyRange}]} && ${Bool[${NetBots[${Group.Member[${n}]}].Buff.Find[${rCure2D[${t},${iCheckForID}]} ]}]}) /varcalc numSick ${numSick}+1
         }
       /next n
       |if enough people have the debuff to cure
       /if (${numSick} >= ${rCure2D[${t},${iMinSick}]}) /call cast_RadiantCure
-    /if (!${ActionTaken})  /next t
+      /if (${ActionTaken}) /break  
+    /next t
   }
 
 | 2- checks specified Target curing: Cure#
@@ -30,6 +33,7 @@ Sub check_Cures
     /if (${Debug} || ${Debug_Cures}) /echo Checking Cures
     /declare curePlayer string local
     /for t 1 to ${cureTargets2D.Size[1]}
+ /if (${cureTargets2D.Size[1]}==0) /break
       /varset curePlayer ${cureTargets2D[${t},${iCastTarget}]}
       /if (${Debug} || ${Debug_Cures}) /echo Checking ${curePlayer} ${NetBots[${curePlayer}].Buff.Find[${Spell[${cureTargets2D[${t},${iCheckFor}]}].ID} ]} ${NetBots[${curePlayer}]}
       /if (${Debug} || ${Debug_Cures}) /echo for ${cureTargets2D[${t},${iCheckFor}]} sid ${Spell[${cureTargets2D[${t},${iCheckFor}]}].ID}
@@ -46,14 +50,17 @@ Sub check_Cures
           } else /if (${Debug} || ${Debug_Cures}) /echo ${cureTargets2D[${t},${iCastName}]} is not ready for ${NetBots[${curePlayer}].Name}
         }
       }
-    /if (!${ActionTaken})  /next t
+    /if (${ActionTaken}) /break  
+    /next t
   }
 
 | 3a - cure group first in cureall
   /if (!${ActionTaken} && ${doCureAll}) {
     /if (${Debug} || ${Debug_Cures}) /echo Checking All
     /for t 1 to ${cureAllTargets2D.Size[1]}
-      /for g 1 to ${Group}
+ /if (${cureAllTargets2D.Size[1]}==0) /break
+     /for g 1 to ${Group}
+        /if (${Group}==0) /break
         /if (${SpawnCount[pc =${Group.Member[${n}]}]} && ${NetBots[${Group.Member[${n}]}].Counters}>0) {
           /if (${NetBots[${Group.Member[${g}]}].Buff.Find[${Spell[${cureAllTargets2D[${t},${iCheckFor}]}].ID} ]}) {
             /call check_Ready "cureAllTargets2D" ${t}
@@ -66,19 +73,20 @@ Sub check_Cures
             } else /if (${Debug} || ${Debug_Cures}) /echo ${cureAllTargets2D[${t},${iCastName}]} is not ready for ${NetBots.Client[${n}]}
           }
         }
-      /if (!${ActionTaken}) /next g
-    /if (!${ActionTaken})  /next t
+      /if (${ActionTaken}) /break
+      /next g
+    /if (${ActionTaken}) /break
+    /next t
   }
 
 | 3b- checks all netbot curing: CureAll#
   /if (!${ActionTaken} && ${doCureAll}) {
-    /if (${Math.Rand[2]}==0) {
+    
       /for n 1 to ${NetBots.Counts}
-    } else {
-      /for n ${NetBots.Counts} downto 1
-    }
-      /if (${SpawnCount[pc =${NetBots.Client[${n}]}]} && ${NetBots[${NetBots.Client[${n}]}].Counters}>0) {
+          /if (${NetBots.Counts}==0) /break
+        /if (${SpawnCount[pc =${NetBots.Client[${n}]}]} && ${NetBots[${NetBots.Client[${n}]}].Counters}>0) {
         /for t 1 to ${cureAllTargets2D.Size[1]}
+          /if (${cureAllTargets2D.Size[1]}==0) /break
           /if (${Debug} || ${Debug_Cures}) /echo ${NetBots.Client[${n}]} sp ${SpawnCount[pc =${NetBots.Client[${n}]}]} bf ${NetBots[${NetBots.Client[${n}]}].Buff.Find[${Spell[${cureAllTargets2D[${t},${iCheckFor}]}].ID} ]} sp ${Spell[${cureAllTargets2D[${t},${iCheckFor}]}].ID}
           /if (${NetBots[${NetBots.Client[${n}]}].Buff.Find[${Spell[${cureAllTargets2D[${t},${iCheckFor}]}].ID} ]}) {
             /call check_Ready "cureAllTargets2D" ${t}
@@ -90,9 +98,11 @@ Sub check_Cures
               } else /if (${Debug} || ${Debug_Cures}) /echo ${cureAllTargets2D[${t},${iCastName}]} is too far away
             } else /if (${Debug} || ${Debug_Cures}) /echo ${cureAllTargets2D[${t},${iCastName}]} is not ready for ${NetBots.Client[${n}]}
           }
-        /if (!${ActionTaken})  /next t
+          /if (${ActionTaken}) /break
+        /next t
       }
-    /if (!${ActionTaken})  /next n
+    /if (${ActionTaken}) /break
+    /next n
 
   }
 /RETURN
@@ -156,6 +166,11 @@ Sub cures_Setup
 |--------------------------------------------|
 |remove cures from arrays if /Zone is not equal to the current zone shortname or All
 Sub cure_spellArrays
+
+  /if (!${Bool[${Ini[${Character_Ini},Cures]}]}) {
+    /return
+  }
+
   /declare i int local
   /declare removeIndexZone string local
   /call IniToArrayV "${Character_Ini},Cures,RadiantCure#"	rCureArray
@@ -165,6 +180,7 @@ Sub cure_spellArrays
   /if (${Defined[cureTargets]}) {
     /varset removeIndexZone
     /for i 1 to ${cureTargets.Size}
+ /if (${cureTargets.Size}==0) /break
       /if (${cureTargets[${i}].Find[/Zone|]}) {
         /call argueString Zone| "${cureTargets[${i}]}"
         /if (!${c_argueString.Find[All]} && !${c_argueString.Find[${Zone.ShortName}]}) /varset removeIndexZone ${removeIndexZone}${i},
@@ -180,6 +196,7 @@ Sub cure_spellArrays
   /if (${Defined[cureAllTargets]}) {
     /varset removeIndexZone
     /for i 1 to ${cureAllTargets.Size}
+ /if (${cureAllTargets.Size}==0) /break
       /if (${cureAllTargets[${i}].Find[/Zone|]}) {
         /call argueString Zone| "${cureAllTargets[${i}]}"
         /if (!${c_argueString.Find[All]} && !${c_argueString.Find[${Zone.ShortName}]}) /varset removeIndexZone ${removeIndexZone}${i},
@@ -196,6 +213,7 @@ Sub cure_spellArrays
     /if (${Defined[rCureArray]}) {
       /varset removeIndexZone
       /for i 1 to ${rCureArray.Size}
+ /if (${rCureArray.Size}==0) /break
         /if (${rCureArray[${i}].Find[/Zone|]}) {
           /call argueString Zone| "${rCureArray[${i}]}"
           /if (!${c_argueString.Find[All]} && !${c_argueString.Find[${Zone.ShortName}]}) /varset removeIndexZone ${removeIndexZone}${i},

@@ -25,13 +25,18 @@ SUB EVENT_dead
 		/if (${Wait4RezAlert}) {
 			/declare a int local
 			/for a 1 to ${Wait4RezAlert}
+ /if (${Wait4RezAlert}==0) /break
 				/beep
 				/delay 1
 			/next a
 		}
 		| Wait for a Rez.
 		/docommand ${ChatToggle} I'm dead. Waiting for rez.
-		/if (!${Defined[Waiting4Rez]}) /declare Waiting4Rez bool outer TRUE
+		/if (!${Defined[Waiting4Rez]}) {
+			/declare Waiting4Rez bool outer TRUE
+		} else {
+			/varset Waiting4Rez TRUE
+		}
 		/call Wait4Rez
 	}
 /if (${Debug} || ${Debug_Wait4Rez}) /echo <== Event_Dead -|
@@ -50,7 +55,11 @@ SUB EVENT_waitNow(line, ChatSender)
 		/consent ${ChatSender}
 		|If I'm not already waiting, wait for a rez.
 		/if (!${Waiting4Rez}) {
-			/if (!${Defined[Waiting4Rez]}) /declare Waiting4Rez bool outer TRUE
+			/if (!${Defined[Waiting4Rez]}) {
+				/declare Waiting4Rez bool outer TRUE
+			} else {
+				/varset Waiting4Rez TRUE
+			}
 			/call Wait4Rez
 		}
 	}
@@ -84,6 +93,7 @@ SUB Wait4Rez(functionCall)
 	/echo Awaiting rez: auto-accepting, and looting my corpse...
 	|Consent NetBots.
 	/for i 1 to ${NetBots.Counts}
+ /if (${NetBots.Counts}==0) /break
 	  /delay 2
 		/consent ${NetBots.Client[${i}]}
 	/next i

@@ -2,17 +2,22 @@
 | Wizard Functions
 |----------------------------------------------------------------------------|
 SUB check_Harvest
-    /if (${autoHarvest} && ${Defined[harvestSpells2D]}) {
+	/if (${autoHarvest} && ${Defined[harvestSpells2D]}) {
+    |only harvest if im not in ooc regen
+    /if (${Me.CombatState.Equal[COMBAT]}) {
       /declare s int local
       /for s 1 to ${harvestSpells2D.Size[1]}
+ /if (${harvestSpells2D.Size[1]}==0) /break
         /call check_Ready "harvestSpells2D" ${s}
         /if (${c_Ready} && ${harvestSpells2D[${s},${iIfs}]}) {
           /if (${check_Mana["harvestSpells2D",${s}]}) {
             /call e3_Cast ${Me.ID} "harvestSpells2D" ${s}
           }
         }
-      /if (!${ActionTaken}) /next s
+      /if (${ActionTaken}) /break
+ /next s
     }
+	}
 /RETURN
 |----------------------------------------------------------------------------|
 Sub WIZ_Setup
@@ -32,6 +37,7 @@ SUB WIZ_MacroSettings
 	/call WriteToIni "${advSettings_Ini},WIZ Functions,WIZ Function#3" "check_AE" 1
 	/call WriteToIni "${advSettings_Ini},WIZ Functions,WIZ Function#4" "check_Nukes" 1
 	/call WriteToIni "${advSettings_Ini},WIZ Functions,WIZ Function#5" "check_Harvest" 1
+	/call WriteToIni "${advSettings_Ini},WIZ Functions,WIZ Function#6" "check_Food" 1
 /if (${Debug}) /echo <== WIZ_MacroSettings -|
 /RETURN
 |----------------------------------------------------------------------------|

@@ -1,7 +1,12 @@
 |--------------------------------------------------------------------|
 |- Contains setup functions for e3.mac								              -|
 |--------------------------------------------------------------------|
+#include e3 Includes\e3_PrivateCode.inc
 #include e3 Includes\e3_Alerts.inc
+#include e3 Includes\e3_Assists_Nukes.inc
+#include e3 Includes\e3_Assists_DoTs.inc
+#include e3 Includes\e3_Assists_Debuffs.inc
+#include e3 Includes\e3_Assists_Events.inc
 #include e3 Includes\e3_Assists.inc
 #include e3 Includes\e3_Background.inc
 #include e3 Includes\e3_Basics.inc
@@ -21,6 +26,9 @@
 #include e3 Includes\e3_Tanking.inc
 #include e3 Includes\e3_Utilities.inc
 #include e3 Includes\e3_Wait4Rez.inc
+#include e3 Includes\e3_QueueCast.inc
+#include e3 Includes\e3_NowCast.inc
+#include e3 Includes\e3_ClearXTargets.inc
 
 #include e3 Includes\e3_Classes_Bard.inc
 #include e3 Includes\e3_Classes_Beastlord.inc
@@ -41,16 +49,27 @@
 
 SUB e3_Setup(modeSelect)
 /if (${Debug}) /echo |- e3_Setup ==>
-  /declare reloadOnLoot bool outer FALSE
-  /declare missingSpellItem string outer
-  /declare numInventorySlots int outer 10
+
+	|/if (${MacroQuest.Server.Equal[Project Lazarus]}) {
+		|/declare serverNameForINI string outer Lazarus
+	|} else {
+		/declare serverNameForINI string outer ${MacroQuest.Server}
+	|}
+	/declare reloadOnLoot bool outer FALSE
+	/declare missingSpellItem string outer
+	/declare numInventorySlots int outer 10
+	/declare previousSpellGemThatWasCast int outer -1
+	/call BuildSpellArrayDefinedValues
+	/call NowCastDefinedValues
+	/call BardClassDefinedValues
+
 	/if (${modeSelect.Equal[Debug]}) /varset Debug TRUE
 	| The file path for e3 Data.ini will still need to be updated in corresponding includes because you must use /noparse to write variables to inis.
 	/declare MacroData_Ini string outer e3 Macro Inis\e3 Data.ini
 	/call check_Plugins
 	/echo Loading e3 v${macroVersion}...
 	| create a macro data
-   /if (!${${IniMode}[${MacroData_Ini}].Length}) {
+	/if (!${${IniMode}[${MacroData_Ini}].Length}) {
 		/echo Welcome to e3! preforming first time setup...
 		/call make_macroDataIni
 	}
@@ -77,7 +96,15 @@ SUB e3_Setup(modeSelect)
     /beep
 		/endmacro
 	} else {
-		/declare Character_Ini string outer ${${IniMode}[${MacroData_Ini},File Paths,Bot Settings]}
+			/declare Character_Ini string outer ${${IniMode}[${MacroData_Ini},File Paths,Bot Settings]}\\${Me.CleanName}_${serverNameForINI}.ini
+			/if (!${Bool[${Ini[${Character_Ini}]}]} && ${Bool[${Ini[${Character_Ini.Replace[Lazarus,PEQTGC]}]}]}) {
+				|/echo WARNING!!!!
+				|/echo INI for ${Me.CleanName}_${serverNameForINI}.ini does not exist but INI for PEQTGC does. Defaulting to ${Me.CleanName}_PEQTGC.ini
+				/varset serverNameForINI PEQTGC
+				/varset Character_Ini ${Character_Ini.Replace[Lazarus,PEQTGC]}
+			}
+		}
+
 	}
 	|Create Ini files ========================================================================================================
 	/if (${Bool[${${IniMode}[${genSettings_Ini}]}]} && !${${IniMode}[${MacroData_Ini},e3 Build,Version].Equal[${macroVersion}]}) {
@@ -93,7 +120,7 @@ SUB e3_Setup(modeSelect)
     /delay 1s
   }
   | Generate Character_Ini.
-  /if (!${${IniMode}[${MacroData_Ini},${Me.CleanName}-PEQTGC,Bot_Ini version].Equal[${macroVersion}]} || !${Bool[${${IniMode}[${Character_Ini}]}]}) {
+  /if (!${${IniMode}[${MacroData_Ini},${Me.CleanName}-${serverNameForINI},Bot_Ini version].Equal[${macroVersion}]} || !${Bool[${${IniMode}[${Character_Ini}]}]}) {
     /delay 1s
     /call EVENT_make_CharacterSettingsIni
   }
@@ -112,6 +139,7 @@ SUB e3_Setup(modeSelect)
   | Setup Includes ==========================================================================================================
   /declare i int local
 	/for i 1 to ${macroSetups.Size}
+ 		/if (${macroSetups.Size}==0) /break
      |/g ${macroSetups[${i}]} ${Time} Start
 		/if (${macroSetups[${i}].Equal[class]}) /varset macroSetups[${i}] ${Me.Class.ShortName}
 		/if (${Bool[${macroSetups[${i}]}]}) /call ${macroSetups[${i}]}_Setup
@@ -119,9 +147,32 @@ SUB e3_Setup(modeSelect)
 	/next i
   |Set Turbo per class based on configuration
   /if (${${IniMode}[${advSettings_Ini},Turbo,${Me.Class.ShortName}].Length}) /declare classTurbo int outer ${${IniMode}[${advSettings_Ini},Turbo,${Me.Class.ShortName}]}
+  
   /squelch /turbo ${classTurbo}
 
-	/echo e3 loaded - Turbo ${classTurbo}
+	|Ewiclip: Adding auto-casting of Necromancer orb heals. 
+	/if (${Bool[${Ini[${Character_Ini},Heals]}]} && !${Bool[${Ini[${Character_Ini},Heals,Auto Cast Necro Heal Orbs (On/Off)]}]}) {
+		/call WriteToIni "${Character_Ini},Heals,Auto Cast Necro Heal Orbs (On/Off)" On
+	}
+
+	/if (${Bool[${Ini[${Character_Ini},Misc]}]} && !${Bool[${Ini[${Character_Ini},Misc,Anchor (Char to Anchor to)]}]}) {
+		/call WriteToIni "${Character_Ini},Misc,Anchor (Char to Anchor to)" ""
+	}
+	
+	/if (${Bool[${Ini[${genSettings_Ini},Misc]}]} && !${Bool[${Ini[${genSettings_Ini},Misc,Gimmie Azure Min Request]}]}) {
+		/call WriteToIni "${genSettings_Ini},Misc,Gimmie Azure Min Requests" "2"
+	}
+	/if (${Bool[${Ini[${Character_Ini},Misc]}]} && !${Bool[${Ini[${genSettings_Ini},Misc,Gimmie Sanguine Min Requests]}]}) {
+		/call WriteToIni "${genSettings_Ini},Misc,Gimmie Sanguine Min Requests" "1"
+	}
+	/if (${Bool[${Ini[${Character_Ini},Misc]}]} && !${Bool[${Ini[${genSettings_Ini},Misc,Gimmie Large Mod Shard Min Requests]}]}) {
+		/call WriteToIni "${genSettings_Ini},Misc,Gimmie Large Mod Shard Min Requests" "1"
+	}
+	/if (${Bool[${Ini[${Character_Ini},Misc]}]} && !${Bool[${Ini[${genSettings_Ini},Misc,Gimmie MoltenOrb Min Requests]}]}) {
+		/call WriteToIni "${genSettings_Ini},Misc,Gimmie MoltenOrb Min Requests" "3"
+	}
+ 	
+	 /echo e3 loaded - Turbo ${classTurbo}
 	
 	/if (${Debug}) {
 		/echo
@@ -139,7 +190,7 @@ SUB e3_Setup(modeSelect)
 SUB make_macroDataIni
 /if (${Debug}) /echo |- make_macroDataIni ==>
 	/noparse /ini "e3 Macro Inis\e3 Data.ini" "e3 Build" "Version"
-	/noparse /ini "e3 Macro Inis\e3 Data.ini" "File Paths" "Bot Settings" "e3 Bot Inis\${Me.CleanName}_PEQTGC.ini"
+	/noparse /ini "e3 Macro Inis\e3 Data.ini" "File Paths" "Bot Settings" "e3 Bot Inis"
 	/noparse /ini "e3 Macro Inis\e3 Data.ini" "File Paths" "General Settings" "e3 Macro Inis\General Settings.ini"
 	/noparse /ini "e3 Macro Inis\e3 Data.ini" "File Paths" "Advanced Settings" "e3 Macro Inis\Advanced Settings.ini"
 /if (${Debug}) /echo <== make_macroDataIni -|
@@ -148,7 +199,7 @@ SUB make_macroDataIni
 |--------------------------------------------------------------------------------|
 |- Generates a general Macro Settings file, to be used by multiple includes.	-|
 |--------------------------------------------------------------------------------|
-#EVENT make_MacroSettingsIni "[MQ2] Make Macro ini"
+#EVENT make_MacroSettingsIni "Make Macro ini"
 SUB EVENT_make_MacroSettingsIni
 /if (${Debug}) /echo |- make_MacroSettingsIni ==>
 	/echo Creating macro settings files...
@@ -197,6 +248,7 @@ SUB EVENT_make_MacroSettingsIni
 	| Call each setup
 	/declare i int local
 	/for i 1 to ${macroSetups.Size}
+ /if (${macroSetups.Size}==0) /break
 		/if (${macroSetups[${i}].Equal[class]}) /varset macroSetups[${i}] ${Me.Class.ShortName}
 		/if (${Bool[${macroSetups[${i}]}]}) /call ${macroSetups[${i}]}_MacroSettings
 	/next i
@@ -225,25 +277,26 @@ SUB EVENT_make_MacroSettingsIni
 |--------------------------------------------------------------------------------|
 |- Generates a general Macro Settings file, to be used by multiple includes.	-|
 |--------------------------------------------------------------------------------|
-#EVENT make_CharacterSettingsIni "[MQ2] Make bot ini"
+#EVENT make_CharacterSettingsIni "Make bot ini"
 SUB EVENT_make_CharacterSettingsIni
 /if (${Debug}) /echo |- make_CharacterSettingsIni ==>
 	/echo Creating ${Me.CleanName}'${If[${Me.CleanName.Right[1].Equal[s]},,s]} settings file...
 	/call IniToArrayV "${advSettings_Ini},Included Setups,Include#" macroSetups
 	/declare i int local
 	/for i 1 to ${macroSetups.Size}
+ /if (${macroSetups.Size}==0) /break
 		/if (${macroSetups[${i}].Equal[class]}) /varset macroSetups[${i}] ${Me.Class.ShortName}
 		/if (${Bool[${macroSetups[${i}]}]}) /call ${macroSetups[${i}]}_CharacterSettings
 		/delay 2
 	/next i
-	/call WriteToIni "${MacroData_Ini},${Me.CleanName}-PEQTGC,Bot_Ini version" "${macroVersion}" 1
+	/call WriteToIni "${MacroData_Ini},${Me.CleanName}-${serverNameForINI},Bot_Ini version" "${macroVersion}" 1
 /if (${Debug}) /echo <== make_CharacterSettingsIni -|
 /RETURN	
 
 |------------------------------------------------------------|
 |- Deletes and Recreates aliases associated with e3.mac.	-|
 |------------------------------------------------------------|
-#EVENT updateAliases "[MQ2] Update macro aliases"
+#EVENT updateAliases "Update macro aliases"
 SUB EVENT_updateAliases
 /if (${Debug}) /echo |- EVENT_updateAliases ==>
 
@@ -265,6 +318,7 @@ SUB EVENT_updateAliases
 	/declare i int local
 	
 	/for i 1 to ${macroSetups.Size}
+ /if (${macroSetups.Size}==0) /break
 		/if (${macroSetups[${i}].Equal[class]}) /varset macroSetups[${i}] ${Me.Class.ShortName}
 		/if (${Bool[${macroSetups[${i}]}]}) {
 			/call ${macroSetups[${i}]}_Aliases
@@ -326,13 +380,13 @@ SUB check_Plugins
 		/if (${NetBots}) {
 			/squelch /netbots on grab=on send=on
 		}
-	|Check MQ2NetAdvPath.
-		/if (!${Plugin[MQ2NetAdvPath].Name.Length}) {
-			/echo Plugin MQ2NetAdvPath is not loaded, attempting to resolve...
-			/plugin MQ2NetAdvPath
-			/delay 3s ${NetAdvPath}
-			/if (!${NetAdvPath}) {
-				/echo ***WARNING*** Could not load MQ2NetAdvPath. Please ensure you're using a copy of MQ2 which was compiled with the MQ2NetAdvPath plugin and try again.
+	|Check MQ2AdvPath.
+		/if (!${Plugin[MQ2AdvPath].Name.Length}) {
+			/echo Plugin MQ2AdvPath is not loaded, attempting to resolve...
+			/plugin MQ2AdvPath
+			/delay 3s ${AdvPath}
+			/if (!${AdvPath}) {
+				/echo ***WARNING*** Could not load MQ2AdvPath. Please ensure you're using a copy of MQ2 which was compiled with the MQ2AdvPath plugin and try again.
 			}
 		}
 	}
@@ -343,7 +397,7 @@ SUB check_Plugins
 		/delay 3s !${Select[${Stick.Status},NULL]}
 		/if (${Select[${Stick.Status},NULL]}) {
 			/echo ***WARNING*** Could not load MQ2MoveUtils! Macro functionality may be limited.
-			/if (!${NetAdvPath}) {
+			/if (!${AdvPath}) {
 				/echo Follow and Assist stick DISABLED.
 			} else {
 				/echo Assist and NPC stick DISABLED.
@@ -376,16 +430,17 @@ SUB check_Plugins
   |Check MQ2ItemDisplay.
 	/if (!${Plugin[mq2itemdisplay].Name.Length}) /plugin MQ2ItemDisplay
 	|Check MQ2LinkDB
-	/if (!${Plugin[MQ2LinkDB].Name.Length}) /plugin MQ2LinkDB
-  |Check MQ2ITurbo
-  /if (!${Plugin[mq2turbo].Name.Length}) {
-    /plugin MQ2Turbo
-    /delay 3s ${Plugin[MQ2Turbo].Name.Length}
-    /if (!${Plugin[MQ2Turbo].Name.Length}) {
-      /echo ***WARNING*** Could not load MQ2Turbo! Performance may be impacted.
-      /echo Using default turbo in e3.mac
-    }
-  }
+	/if (!${Plugin[MQ2LinkDB].Name.Length}) {
+			 /plugin MQ2LinkDB
+			 
+	}
+	|new mq2 version has performance issues with version 2.3 of the plugin
+	|when scanning new links. Diabled by default for now.
+	|Note, Version 2.1 will crash the client if you issue this command, make sure its > than that.
+	/if (${Plugin[MQ2LinkDB].Name.Length} && ${Plugin[MQ2LinkDB].Version}>2.1) {
+				/link /scan off
+	}
+
 |Check MQ2HUD.
 |	/if (!${Plugin[mq2hud].Name.Length}) /plugin MQ2HUD
 /RETURN

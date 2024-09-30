@@ -32,6 +32,7 @@ sub event_add_RuneTarget(line, ChatSender, RuneTarget)
     } else {
         /declare i int local
         /for i 1 to ${runeTargets.Size}
+ /if (${runeTargets.Size}==0) /break
           /if (${runeTargets[${i}].Equal[${Spawn[pc =${RuneTarget}].CleanName}]}) {
             /docommand ${ChatToggle} I am already maintaining rune ${RuneTarget}
             /return
@@ -54,6 +55,7 @@ sub event_remove_RuneTarget(line, ChatSender, RuneTarget)
       /if (${Defined[RuneTarget]}) {
         /declare i int local
         /for i 1 to ${runeTargets.Size}
+ /if (${runeTargets.Size}==0) /break
           /if (${runeTargets[${i}].Equal[${Spawn[pc =${RuneTarget}].CleanName}]}) {
             /docommand ${ChatToggle} No longer maintaining Rune on [${runeTargets[${i}]}].
             /call RemoveArrayElement runeTargets "${runeTargets[${i}]}"
@@ -76,7 +78,9 @@ Sub check_rune
   /declare t int local
   /declare s int local
   /for t 1 to ${runeTargets.Size}
-    /for s 1 to ${runeArray2D.Size[1]}
+ /if (${runeTargets.Size}==0) /break
+    /for t 1 to ${runeTargets.Size}
+ /if (${runeTargets.Size}==0) /break
       /if (${Bool[${NetBots[${runeTargets[${t}]}].InZone}]} && !${Bool[${NetBots[${runeTargets[${t}]}].Buff.Find[${runeArray2D[${s},${iCastID}]} ]}]}) {
         /call check_Ready "runeArray2D" ${s}
         /if (${c_Ready}) {
@@ -88,8 +92,10 @@ Sub check_rune
           }
         }
       }
-    /if (!${Bool[${currentBot}]}) /next s
-  /if (!${Bool[${currentBot}]}) /next t
+    /if (${Bool[${currentBot}]}) /break
+    /next s
+    /if (${Bool[${currentBot}]}) /break
+  /next t
 }
 /if (${Debug}) /echo <== check_rune -|
 /return
@@ -100,7 +106,7 @@ sub event_charmOn(line, ChatSender, targetID)
   /if (${Me.Class.ShortName.Equal[ENC]} || ${Me.Class.ShortName.Equal[BRD]}) {
     /if (${Debug} || ${Debug_Ench}) /echo |-  charmOn ==>
     |&& (!${Spawn[id ${targetID}].Named} || ${Spawn[id ${targetID}].CleanName.Equal[Coerced Lieutenant]})
-      /if ((${Spawn[id ${targetID}].Distance} < 240 && ${Spawn[id ${targetID}].Level} <= ${Me.Level} && ${SpawnCount[npc id ${targetID}]}>0) || ${targetID}==${Me.Pet.ID}) {
+      /if ((${Spawn[id ${targetID}].Distance} < 240  && ${SpawnCount[npc id ${targetID}]}>0) || ${targetID}==${Me.Pet.ID}) {
         /varset charmTarget ${targetID}
         /varset doCharm TRUE
         /docommand ${ChatToggle} << Charm enabled ${Spawn[id ${charmTarget}].CleanName} >>
@@ -160,6 +166,7 @@ Sub check_charm
     /if (!${Bool[${Me.Pet.ID}]}) {
       /bc [+r+] << ${Spawn[id ${charmTarget}].CleanName} is not Charmed! >> [+r+]
       /for s 1 to ${charmArray2D.Size[1]}
+ /if (${charmArray2D.Size[1]}==0) /break
       /call check_Ready "charmArray2D" ${s}
       /if (${c_Ready}) {
         /if (${check_Mana["charmArray2D",${s}]}) {
@@ -180,10 +187,12 @@ Sub check_charm
           }
         }
       }
-      /if (!${Bool[${Me.Pet.ID}]}) /next s
+      /if (${Bool[${Me.Pet.ID}]}) /break 
+    /next s
     } else {
     |accounce time left on charm
       /for s 1 to ${charmArray2D.Size[1]}
+ /if (${charmArray2D.Size[1]}==0) /break
         /if (${Bool[${Me.PetBuff[${charmArray2D[${s},${iSpellName}]}]}]}) {
           /varset charmDuration ${Pet.BuffDuration[${charmArray2D[${s},${iSpellName}]}].TotalSeconds}
           |/echo charmduration ${charmDuration} timer ${charmBuffTimer}
@@ -220,11 +229,13 @@ sub check_mez
     /declare mezTarg int local
     /if (!${SpawnCount[playerstate 4 npc targetable radius ${AE_Radius}]}) /return
     /for i 1 to ${SpawnCount[playerstate 4 npc targetable radius ${AE_Radius}]}
+ /if (${SpawnCount[playerstate 4 npc targetable radius ${AE_Radius}]}==0) /break
       /varset mezTarg ${NearestSpawn[${i},playerstate 4 npc targetable radius ${AE_Radius}].ID}
       /call TrueTarget ${mezTarg}
       /delay 1s ${Target.BuffsPopulated}
       /if (${Select[${AssistTarget},${mezTarg}]}==0 && (!${Bool[${Target.Mezzed}]} || ${Target.Mezzed.Duration.TotalSeconds} < 8)) {
         /for s 1 to ${mezArray2D.Size[1]}
+ /if (${mezArray2D.Size[1]}==0) /break
           /call check_Ready "mezArray2D" ${s}
           /if (${c_Ready}) {
             /if (${check_Mana["mezArray2D",${s}]}) {
@@ -234,9 +245,11 @@ sub check_mez
               }
             }
           }
-        /if (!${ActionTaken}) /next s
+        /if (${ActionTaken}) /break
+ /next s
       }
-    /if (!${ActionTaken}) /next i
+    /if (${ActionTaken}) /break
+ /next i
   }
 /if (${Debug}) /echo <== check_Mez -|
 /return
@@ -283,20 +296,21 @@ Sub ENC_Background_Events
 	/doevents toggleRune
 	/doevents add_RuneTarget
 	/doevents remove_RuneTarget
-	/if (${Assisting} && ${Bool[${gatherManaPCT}]} && ${Me.PctMana} < ${gatherManaPCT} && ${Me.AltAbilityReady[Gather Mana]} && ${Me.CombatState.Equal[COMBAT]}) /casting "Gather Mana" -maxtries|3
+	/if (${Assisting} && ${Bool[${gatherManaPCT}]} && ${Me.PctMana} < ${gatherManaPCT} && ${Me.AltAbilityReady[Gather Mana]} && ${Me.CombatState.Equal[COMBAT]}) /call castSimpleSpell "Gather Mana" 0
 /return
 |----------------------------------------------------------------------------|
 SUB ENC_MacroSettings
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#1" "check_Charm" 1
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#2" "check_Mez" 1
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#3" "check_Rune" 1
-	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#4" "check_Burns" 1
-	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#5" "check_Debuffs" 1
-  /call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#6" "check_Buffs" 1
+  /call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#4" "check_Debuffs" 1
+  /call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#5" "check_Buffs" 1
+	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#6" "check_Burns" 1
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#7" "check_DoTs" 1
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#8" "check_AE" 1
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#9" "check_Nukes" 1
 	/call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#10" "check_Pets" 1
+  /call WriteToIni "${advSettings_Ini},ENC Functions,ENC Function#11" "check_Food" 1
 /RETURN
 |----------------------------------------------------------------------------|
 SUB ENC_CharacterSettings

@@ -11,16 +11,44 @@
 |------------------------------------------------------------|
 SUB check_Heals
 /if (${Debug} || ${Debug_Heals}) /echo |- healLoop  ==>
-  /doevents wordHeal
-	/if (${do_GroupHeals}) 							      /call groupHeals
-	/if (!${ActionTaken} && ${healTanks}) 		/call heal_tanks
-	/if (!${ActionTaken} && ${healImportant}) /call heal_importantBots
-	/if (!${ActionTaken} && ${healAll}) 			/call heal_allbots
-	/if (!${ActionTaken} && ${hotTanks}) 			/call hot_tanks
-	/if (!${ActionTaken} && ${hotImportant}) 	/call hot_importantBots
-	/if (!${ActionTaken} && ${hotAll}) 				/call hot_allbots
-	/if (!${ActionTaken} && ${healPets}) 			/call heal_Pets
-	/if (!${ActionTaken} && ${hotPets}) 			/call hot_Pets
+  	/doevents wordHeal
+
+	/varset ActionTaken True
+	/declare AtLeastOneActionTaken bool local False
+	/declare healLoopCounter int local 0
+
+	/while (${ActionTaken} &&  ${healLoopCounter} < 5) {
+		|don't continue if nowcast has something to do
+		/if (${nowSpellArrayQueueCount}>0) {
+			/varset ActionTaken True
+			/return
+		} 
+		/if (${Defined[lifeSupport2D]} && ${Me.PctHPs} < 99) /call check_lifeSupport
+		/varset ActionTaken False
+		/if (${healTanks}) 		/call heal_tanks
+		|don't continue if nowcast has something to do
+		/if (${nowSpellArrayQueueCount}>0) {
+			/varset ActionTaken True
+			/return
+		} 
+		/if (${healXTargets}) 	/call heal_xtargets2
+		/if (!${ActionTaken} && ${healImportant})   /call heal_importantBots
+		/if (!${ActionTaken} && ${do_GroupHeals}) 	/call groupHeals
+		/if (!${ActionTaken} && ${healAll}) 			/call heal_allbots
+		/if (!${ActionTaken} && ${hotTanks}) 			/call hot_tanks
+		/if (!${ActionTaken} && ${hotImportant}) 	/call hot_importantBots
+		/if (!${ActionTaken} && ${hotAll}) 				/call hot_allbots
+		/if (!${ActionTaken} && ${healPets}) 			/call heal_Pets
+		/if (!${ActionTaken} && ${hotPets}) 			/call hot_Pets
+		
+		/if (${ActionTaken}) {
+			/varset AtLeastOneActionTaken true
+		}
+		/varcalc healLoopCounter ${healLoopCounter}+1
+	}
+	|set actiontaken back to what it should be, if any action was taken.
+	/varset ActionTaken ${AtLeastOneActionTaken}
+	
 /if (${Debug} || ${Debug_Heals}) /echo <== healLoop -|
 /return
 
@@ -30,25 +58,46 @@ SUB check_Heals
 SUB check_lifeSupport
 /if (${Debug} || ${Debug_Heals}) /echo |- check_lifeSupport ==>
 	/declare s int local
-	| only use life support when near mobs
-	/if  (${SpawnCount[npc radius 200]} > 0) {
-		/for s 1 to ${lifeSupport2D.Size[1]}
-			/if (${Me.PctHPs} <= ${lifeSupport2D[${s},${iHealPct}]}) {
-				/call check_Ready "lifeSupport2D" "${s}"
-				/if (${c_Ready} && ${lifeSupport2D[${s},${iIfs}]}) {
-					/if (${Bool[${Me.AbilityReady[${lifeSupport2D[${s},${iCastName}]}]}]}) {
-            /if (${Me.Casting.ID} && ${Me.Class.ShortName.NotEqual[BRD]}) /call interrupt
-						/doability "${lifeSupport2D[${s},${iCastName}]}"
-					} else {
-            /if (${check_Mana["lifeSupport2D",${s}]}) {
+	/declare previousTarget int local 0
+	/declare castName string local
+	|no need to do queries if are are full life
+	/if (${Me.PctHPs}<99) {
+		| only use life support when near mobs and it is agressive to us or we are in combat and there are npcs in 200 radius
+		/if  (${Bool[${Spawn[npc radius 50].Aggressive}]}|| (${SpawnCount[npc radius 200]} > 0 && ${Me.CombatState.Equal[COMBAT]})) {
+			/for s 1 to ${lifeSupport2D.Size[1]}
+ 				/if (${lifeSupport2D.Size[1]}==0) /break
+				/varset castName ${lifeSupport2D[${s},${iCastName}]}
+				/if (${Me.PctHPs} <= ${lifeSupport2D[${s},${iHealPct}]}) {
+					/call check_Ready "lifeSupport2D" "${s}"
+					/if (${c_Ready} && ${lifeSupport2D[${s},${iIfs}]}) {
+						/if (${Bool[${Me.AbilityReady[${lifeSupport2D[${s},${iCastName}]}]}]}) {
 							/if (${Me.Casting.ID} && ${Me.Class.ShortName.NotEqual[BRD]}) /call interrupt
-							/call e3_Cast ${Me.ID} "lifeSupport2D" ${s}
+							/doability "${lifeSupport2D[${s},${iCastName}]}"
+						} else {
+								/if (${check_Mana["lifeSupport2D",${s}]}) {
+									/if (${Me.Casting.ID} && ${Me.Class.ShortName.NotEqual[BRD]}) /call interrupt
+									
+									/if (${castName.Find[Divine Healing]} || ${castName.Find[Sanguine Mind Crystal]}) {
+										/bc [${Time}] ****calling ${castName} without changing target
+										/call e3_Cast ${Target.ID} "lifeSupport2D" ${s}
+
+									} else {
+
+										/varset previousTarget ${Target.ID}
+										/call e3_Cast ${Me.ID} "lifeSupport2D" ${s}
+										/call TrueTarget ${previousTarget}
+										
+									}
+									
+							}
 						}
 					}
 				}
-			}
-		/next s
+			/next s
+		}
+
 	}
+
 /if (${Debug} || ${Debug_Heals}) /echo <== check_lifeSupport -|
 /RETURN
 
@@ -60,25 +109,81 @@ SUB heal_tanks
 	/declare currentBot string local NULL
 	/declare currentSpellIndx int local
 	/declare t int local
-	/declare s int local	
+	/declare s int local
+	/declare GroupMemberIndex int local -1
+	/declare buffCheckForName	string local
+	/declare buffCheckForID int local -1
+
 	/for t 1 to ${tanks.Size}
+		
+ 		/if (${tanks.Size}==0) /break
 		/for s 1 to ${tankHeals2D.Size[1]}
-			/if (${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${tankHeals2D[${s},${iHealPct}]}) {
-				/call check_Ready "tankHeals2D" ${s}
+			/if (${tankHeals2D.Size[1]}==0) /break
+			/varset GroupMemberIndex -1
+			
+			/varset buffCheckForID ${tankHeals2D[${s},${iCheckForID}]}
+			/if (${buffCheckForID}>0) {
+				|have heal buff to check for
+				/if (${Bool[${NetBots[${tanks[${t}]}].Buff.Find[${buffCheckForID}]}]}	|| ${Bool[${NetBots[${tanks[${t}]}].ShortBuff.Find[${buffCheckForID} ]}]}) {
+					|cannot use this as buff exists
+					|/echo [${Time}] <heal_tanks> skipping heal as buff is found ${tankHeals2D[${s},${iCastName}]} for buffid: ${buffCheckForID}
+					/goto :skipHeal
+				}
+			}
+			|Netbots seems to sometimes.. lag? freeze? etc. Have a local group heal check as backup
+			|if we can't find a local group heal to heal, then check netbots. at worst case we overheal.
+			/if (${Bool[${Group.Member[${tanks[${t}]}].Index}]}) {
+				/varset GroupMemberIndex ${Group.Member[${tanks[${t}]}].Index}
+			|	/echo Group member index for tank : ${GroupMemberIndex}
+			}
+			|try a group based check
+			/if (${GroupMemberIndex} >-1 && !${Group.Member[${GroupMemberIndex}].OtherZone} && ${Group.Member[${GroupMemberIndex}].Spawn.CurrentHPs} < ${tankHeals2D[${s},${iHealPct}]}) {
+				/call check_Ready "tankHeals2D" ${s}		
 				/if (${c_Ready} && ${tankHeals2D[${s},${iIfs}]}) {
-          /if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
-            /if (${check_Mana["tankHeals2D",${s}]}) {
-							/varset currentBot ${tanks[${t}]}
-							/varset currentSpellIndx ${s}
+					/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
+						/if (${check_Mana["tankHeals2D",${s}]}) {
+									/echo [${Time}] heal_tanks: selecting :  ${tanks[${t}]} To heal from group heal code. ${Group.Member[${GroupMemberIndex}].Spawn.CurrentHPs} vs ${NetBots[${tanks[${t}]}].PctHPs}
+									/varset currentBot ${tanks[${t}]}
+									/varset currentSpellIndx ${s}
 						}
 					}
 				}
 			}
-		/if (!${Bool[${currentBot}]}) /next s
-	/if (!${Bool[${currentBot}]}) /next t
+			|did we find current bot to heal? if not fall back to netbots to check
+			/if (!${Bool[${currentBot}]} && ${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${tankHeals2D[${s},${iHealPct}]}) {
+
+				/call check_Ready "tankHeals2D" ${s}		
+				/if (${c_Ready} && ${tankHeals2D[${s},${iIfs}]}) {
+					/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
+						/if (${check_Mana["tankHeals2D",${s}]}) {
+									/echo [${Time}] heal_tanks: selecting :  ${tanks[${t}]} To heal from netbots heal code.  ${Group.Member[${GroupMemberIndex}].Spawn.CurrentHPs} vs ${NetBots[${tanks[${t}]}].PctHPs}
+									/varset currentBot ${tanks[${t}]}
+									/varset currentSpellIndx ${s}
+						}
+					}
+				}
+			}
+			:skipHeal
+		/if (${Bool[${currentBot}]}) /break
+		/next s
+		/if (${Bool[${currentBot}]}) /break
+	/next t
 
 	/if (${Bool[${currentBot}]}) {
+		/if (${UseNecroHealOrbs} && ${Target.PctHPs} < 60) {
+			
+			/if (${Me.ItemReady[Orb of Shadows]}) {
+				/bc [${Time}] <e3_Heals> Instant casting heal via orb of shadows to ${currentBot}
+				/call castSimpleSpell "Orb of Shadows" ${NetBots[${currentBot}].ID} True
+				/delay 3
+			} else /if (${Me.ItemReady[Orb of Souls]}) {
+				/bc [${Time}] <e3_Heals> Instant casting heal via Orb of Souls to ${currentBot}
+				/call castSimpleSpell "Orb of Souls" ${NetBots[${currentBot}].ID} True
+				/delay 3
+			}
+		}
 		/call e3_Cast ${NetBots[${currentBot}].ID} "tankHeals2D" ${currentSpellIndx}
+		
 	}	
 	
 /if (${Debug} || ${Debug_Heals}) /echo <== heal_tanks -|
@@ -89,14 +194,47 @@ SUB heal_tanks
 |------------------------------------------------|
 SUB heal_importantBots
 /if (${Debug} || ${Debug_Heals}) /echo |- heal_importantBots ==>
+  /declare buffCheckForName	string local
+  /declare buffCheckForID int local -1
   /declare currentBot string local
   /declare currentSpellIndx int local
   /declare t int local
   /declare s int local
+  /declare GroupMemberIndex int local -1	
   /for t 1 to ${importantBots.Size}
-    /for s 1 to ${importantHeals2D.Size[1]}
+ /if (${importantBots.Size}==0) /break
+     /for s 1 to ${importantHeals2D.Size[1]}
+ 		/if (${importantHeals2D.Size[1]}==0) /break
+		/varset GroupMemberIndex -1
+		/varset buffCheckForID ${importantHeals2D[${s},${iCheckForID}]}
+		/if (${buffCheckForID}>0) {
+			|have heal buff to check for
+			/if (${Bool[${NetBots[${importantBots[${t}]}].Buff.Find[${buffCheckForID}]}]}	|| ${Bool[${NetBots[${importantBots[${t}]}].ShortBuff.Find[${buffCheckForID} ]}]}) {
+				|cannot use this as buff exists
+				|/echo [${Time}] <heal_tanks> skipping heal as buff is found ${importantHeals2D[${s},${iCastName}]} for buffid: ${buffCheckForID}
+				/continue
+			}
+		}
+	|Netbots seems to sometimes.. lag? freeze? etc. Have a local group heal check as backup
+	|if we can't find a local group heal to heal, then check netbots. at worst case we overheal.
+	/if (${Bool[${Group.Member[${importantBots[${t}]}].Index}]}) {
+		/varset GroupMemberIndex ${Group.Member[${importantBots[${t}]}].Index}
+	|	/echo Group member index for tank : ${GroupMemberIndex}
+	}
+	|try a group based check
+	/if (${GroupMemberIndex} >-1 && !${Group.Member[${GroupMemberIndex}].OtherZone} && ${Group.Member[${GroupMemberIndex}].Spawn.CurrentHPs} < ${importantHeals2D[${s},${iHealPct}]}) {
+		/call check_Ready "importantHeals2D" ${s}		
+		/if (${c_Ready} && ${importantHeals2D[${s},${iIfs}]}) {
+			/if (${check_Distance[${NetBots[${importantBots[${t}]}].ID},${importantHeals2D[${s},${iMyRange}]}]}) {
+				/if (${check_Mana["importantHeals2D",${s}]}) {
+							/varset currentBot ${importantBots[${t}]}
+							/varset currentSpellIndx ${s}
+				}
+			}
+		}
+	}
     /if (${Bool[${NetBots[${importantBots[${t}]}].InZone}]} && ${NetBots[${importantBots[${t}]}].PctHPs} <= ${importantHeals2D[${s},${iHealPct}]}) {
-      /call check_Ready "importantHeals2D" ${s}
+     /call check_Ready "importantHeals2D" ${s}
       /if (${c_Ready} && ${importantHeals2D[${s},${iIfs}]}) {
         /call check_Distance
         /if (${check_Distance[${NetBots[${importantBots[${t}]}].ID},${importantHeals2D[${s},${iMyRange}]}]}) {
@@ -114,7 +252,13 @@ SUB heal_importantBots
 
   |/echo cb ${currentBot} ${Bool[${currentBot}]}
 	/if (${Bool[${currentBot}]}) {
+
+		/varset importantHeals2D[${currentSpellIndx},${iSubToRun}] check_TankNeedHeal
+		|-Our cast may have been interrupted so need to do a quick check on heals
 		/call e3_Cast ${NetBots[${currentBot}].ID} "importantHeals2D" ${currentSpellIndx}
+		/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+			/call heal_tanks
+		}
 	}
 /if (${Debug} || ${Debug_Heals}) /echo <== heal_importantBots -|
 /RETURN
@@ -131,19 +275,17 @@ SUB heal_Allbots
 	/declare s int local 1
 	
 	|Randomly Iterate forward or backwards to reduce overheal
-	/if (${Math.Rand[2]}==0) {
-		/for t 1 to ${NetBots.Counts}
-	} else {
-		/for t ${NetBots.Counts} downto 1
-	}
 	
-	/varset currClient ${NetBots.Client[${t}]}
+	/for t 1 to ${NetBots.Counts}
+	 /if (${NetBots.Counts}==0) /break
+		/varset currClient ${NetBots.Client[${t}]}
 		/for s 1 to ${allHeals2D.Size[1]}
+ 			/if (${allHeals2D.Size[1]}==0) /break
 			/if (${Bool[${NetBots[${currClient}].InZone}]} && ${NetBots[${currClient}].PctHPs} <= ${allHeals2D[${s},${iHealPct}]}) {
 				/call check_Ready "allHeals2D" ${s}
 				/if (${c_Ready} && ${allHeals2D[${s},${iIfs}]}) {
-          /if (${check_Distance[${NetBots[${currClient}].ID},${allHeals2D[${s},${iMyRange}]}]}) {
-            /if (${check_Mana["allHeals2D",${s}]}) {
+          			/if (${check_Distance[${NetBots[${currClient}].ID},${allHeals2D[${s},${iMyRange}]}]}) {
+            			/if (${check_Mana["allHeals2D",${s}]}) {
 							/if (!${Bool[${currentBot}]} || ${NetBots[${currClient}].PctHPs} < ${NetBots[${currentBot}].PctHPs}) {
 								/varset currentBot ${currClient}
 								/varset currentSpellIndx ${s}
@@ -152,16 +294,135 @@ SUB heal_Allbots
 					}
 				}
 			}
-		/next s
-	/next t
+			/next s
+		/next t
 
 	/if (${Bool[${currentBot}]}) {	
+
+		/varset allHeals2D[${currentSpellIndx},${iSubToRun}] check_TankAndXTargetNeedHeal
+		
 		/call e3_Cast ${NetBots[${currentBot}].ID} "allHeals2D" ${currentSpellIndx}	
 |		/call set_RecentHealTimer "${allHeals2D[${s},${iCastType}]}"
+		|-Our cast may have been interrupted so need to do a quick check on heals
+		/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+			/call heal_tanks
+			/call heal_xtargets
+		}
 	}	
 /if (${Debug} || ${Debug_Heals}) /echo <== heal_Allbots -|
 /RETURN
 
+|------------------------------------------------|
+|- Find the lowest hp XTarget to heal			-|
+|------------------------------------------------|
+SUB heal_xtargets
+/if (${Debug} || ${Debug_Heals}) /echo |- heal_xtargets ==>
+	/declare currentBot int local NULL
+	/declare xtargetIndex int local NULL
+	/declare currentSpellIndx int local
+	/declare s int local 1
+	/declare numXTargets int local 13
+	
+	|Randomly Iterate forward or backwards to reduce overheal
+		/for xtargetIndex 1 to ${numXTargets}
+ 			/if (${numXTargets}==0) /break
+	
+			/if (${Me.XTarget[${xtargetIndex}].TargetType.Equal[Specific PC]} ) {
+				/for s 1 to ${xtargetHeals2D.Size[1]}
+ 					/if (${xtargetHeals2D.Size[1]}==0) /break
+					/if (${Me.XTarget[${xtargetIndex}].PctHPs} < ${xtargetHeals2D[${s},${iHealPct}]}) {
+					/call check_Ready "xtargetHeals2D" ${s}
+					/if (${c_Ready} && ${xtargetHeals2D[${s},${iIfs}]}) {
+						/if (${check_Distance[${Me.XTarget[${xtargetIndex}].ID},${xtargetHeals2D[${s},${iMyRange}]}]}) {
+							/if (${check_Mana["xtargetHeals2D",${s}]}) {
+								/if (!${Bool[${currentBot}]} || ${Me.XTarget[${xtargetIndex}].PctHPs} < ${Me.XTarget[${currentBot}].PctHPs}) {
+									/echo Setting xtarget to heal ${Me.XTarget[${xtargetIndex}].Name}
+									/varset currentBot ${xtargetIndex}
+									/varset currentSpellIndx ${s}
+								}
+							}
+						}
+					}
+				}
+			/next s
+		}
+	/next xtargetIndex
+
+	/if (${Bool[${currentBot}]}) {
+		/if (${UseNecroHealOrbs} && ${Target.PctHPs} < 60) {
+			/if (${Me.ItemReady[Orb of Shadows]}) {
+				/call castSimpleSpell "Orb of Shadows" ${NetBots[${currentBot}].ID}
+			} else /if (${Me.ItemReady[Orb of Souls]}) {
+				/call castSimpleSpell "Orb of Souls" ${NetBots[${currentBot}].ID}
+			}
+		}
+		/call e3_Cast ${Me.XTarget[${currentBot}].ID} "xtargetHeals2D" ${currentSpellIndx}	
+		
+	}
+/if (${Debug} || ${Debug_Heals}) /echo <== heal_xtargets -|
+/RETURN
+
+SUB heal_xtargets2
+/if (${Debug} || ${Debug_Heals}) /echo |- heal_xtargets ==>
+	/declare currentBot int local 0
+	/declare currentLowestHps int local 100
+	/declare xtargetIndex int local 1
+	/declare s int local 1
+	/declare numXTargets int local 13
+	
+
+	|find the lowest hp xtarget
+
+	/for xtargetIndex 1 to ${numXTargets}
+ 		/if (${numXTargets}==0) /break
+		|if this is a PC
+		
+		/if (!${Me.XTarget[${xtargetIndex}].TargetType.Equal[Specific PC]}) /continue
+		| and within a 200 unit range
+		/if (${check_Distance[${Me.XTarget[${xtargetIndex}].ID},200]}) {
+			|are their HP lower than the current lowest, without being dead
+			/if (${Me.XTarget[${xtargetIndex}].PctHPs} < ${currentLowestHps} && ${Me.XTarget[${xtargetIndex}].PctHPs} >0 ) {
+				|set them as the ID to be currently used
+				/varset currentBot ${Me.XTarget[${xtargetIndex}].ID}
+				/varset currentLowestHps ${Me.XTarget[${xtargetIndex}].PctHPs}					
+			}
+		}
+
+	/next xtargetIndex
+
+	/if (${currentBot} >0 && ${currentLowestHps} < 95) {
+		
+		/for s 1 to ${xtargetHeals2D.Size[1]}
+ 			/if (${xtargetHeals2D.Size[1]}==0) /break
+			/if (${currentLowestHps} < ${xtargetHeals2D[${s},${iHealPct}]}) {
+				
+				/if (${xtargetHeals2D[${s},${iIfs}]}) {
+					/echo [${Time}] <XTarget_Heals> found target to heal ${currentBot} at ${currentLowestHps}%
+					/if (${check_Distance[${currentBot},${xtargetHeals2D[${s},${iMyRange}]}]}) {
+						/if (${check_Mana["xtargetHeals2D",${s}]}) {
+							/call check_Ready "xtargetHeals2D" ${s}
+							/if (${c_Ready}) {
+
+								/if (${UseNecroHealOrbs} && ${Target.PctHPs} < 60) {
+									/if (${Me.ItemReady[Orb of Shadows]}) {
+										/call castSimpleSpell "Orb of Shadows"  ${currentBot}
+									} else /if (${Me.ItemReady[Orb of Souls]}) {
+										/call castSimpleSpell "Orb of Souls"  ${currentBot}
+									}
+								}
+								/call e3_Cast ${currentBot} "xtargetHeals2D" ${s}	
+								/if (${ActionTaken}) /goto :endxtargets
+							} 
+				
+						}
+					}
+				} 
+			}
+		/next s
+	}
+	:endxtargets
+/if (${Debug} || ${Debug_Heals}) /echo <== heal_xtargets -|
+/RETURN
 |------------------------------------------------|
 |- Find the lowest hp Pet to heal				-|
 |------------------------------------------------|
@@ -172,9 +433,11 @@ SUB heal_pets
 	/declare t int local
 	/declare s int local
 	/for t 1 to ${petOwners.Size}
+ /if (${petOwners.Size}==0) /break
 	  |/echo ${petOwners[${t}]} ${Spawn[pc =${petOwners[${t}]}].Pet.Name} hp ${NetBots[${petOwners[${t}]}].PetHP}
 	  /if (${Bool[${NetBots[${petOwners[${t}]}].InZone}]} && ${Spawn[pc =${petOwners[${t}]}].Pet.ID}) {
 			/for s 1 to ${petHeals2D.Size[1]}
+ 				/if (${petHeals2D.Size[1]}==0) /break
 				/if (${NetBots[${petOwners[${t}]}].PetHP} <= ${petHeals2D[${s},${iHealPct}]}) {
 					/call check_Ready "petHeals2D" ${s}
 					/if (${c_Ready} && ${petHeals2D[${s},${iIfs}]}) {
@@ -193,7 +456,17 @@ SUB heal_pets
 	/next t
 |	/echo ${currentBot} ${Spawn[pc =${currentBot}].Pet.ID} ${Spawn[pc =${currentBot}].Pet.Name}
 	/if (${Bool[${currentBot}]}) {
+
+		/varset petHeals2D[${currentSpellIndx},${iSubToRun}] check_TankAndXTargetNeedHeal
 		/call e3_Cast ${NetBots[${currentBot}].PetID} "petHeals2D" ${currentSpellIndx}
+		
+		|-Our cast may have been interrupted so need to do a quick check on heals
+		/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+			/call heal_tanks
+			/call heal_xtargets
+		}
+
+		
 	}
 	
 /if (${Debug} || ${Debug_Heals}) /echo <== heal_pets -|
@@ -209,14 +482,16 @@ SUB hot_tanks
 	/declare t int local
 	/declare s int local		
 	/for t 1 to ${tanks.Size}
+ /if (${tanks.Size}==0) /break
 		/for s 1 to ${hotSpells2D.Size[1]}
+ 			/if (${hotSpells2D.Size[1]}==0) /break
 			/if (${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${hotSpells2D[${s},${iHealPct}]}) {
 				/call check_HotTankStack "${tanks[${t}]}" ${hotSpells2D[${s},${iSpellID}]}
 				/if (${c_SubToRun}) {
 					/call check_Ready "hotSpells2D" ${s}
 					/if (${c_Ready} && ${hotSpells2D[${s},${iIfs}]}) {
-            /if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${hotSpells2D[${s},${iMyRange}]}]}) {
-              /if (${check_Mana["hotSpells2D",${s}]}) {
+            			/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${hotSpells2D[${s},${iMyRange}]}]}) {
+              				/if (${check_Mana["hotSpells2D",${s}]}) {
 								/varset currentBot ${tanks[${t}]}
 								/varset currentSpellIndx ${s}
 							}
@@ -224,12 +499,21 @@ SUB hot_tanks
 					}
 				}
 			}
-		/if (!${Bool[${currentBot}]}) /next s
-	/if (!${Bool[${currentBot}]}) /next t
+		/if (${Bool[${currentBot}]}) /break
+		/next s
+		/if (${Bool[${currentBot}]}) /break
+	/next t
 	
 	/if (${Bool[${currentBot}]}) {
-		/varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_HotTankStack
+
+		/varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_TankAndXTargetNeedHeal
 		/call e3_Cast ${NetBots[${currentBot}].ID} "hotSpells2D" ${currentSpellIndx}
+
+		|-Our cast may have been interrupted so need to do a quick check on heals
+		/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+			/call heal_tanks
+			/call heal_xtargets
+		}
 |		/call set_RecentHealTimer "${hotSpells2D[${currentSpellIndx},${iCastType}]}"
 	}	
 /if (${Debug} || ${Debug_Heals}) /echo <== hot_tanks -|
@@ -244,9 +528,12 @@ SUB hot_importantBots
   /declare currentSpellIndx int local
   /declare t int local
   /declare s int local
-  /for t 1 to ${importantBots.Size}
-    /for s 1 to ${hotSpells2D.Size[1]}
-    /if (${Bool[${NetBots[${importantBots[${t}]}].InZone}]} && ${NetBots[${importantBots[${t}]}].PctHPs} <= ${hotSpells2D[${s},${iHealPct}]}) {
+	
+	/for t 1 to ${importantBots.Size}
+		/if (${importantBots.Size}==0) /break
+   		/for s 1 to ${hotSpells2D.Size[1]}
+ 		/if (${hotSpells2D.Size[1]}==0) /break
+    	/if (${Bool[${NetBots[${importantBots[${t}]}].InZone}]} && ${NetBots[${importantBots[${t}]}].PctHPs} <= ${hotSpells2D[${s},${iHealPct}]}) {
 		/call check_HotImportantBotStack "${importantBots[${t}]}" ${hotSpells2D[${s},${iSpellID}]}
 		/if (${c_SubToRun}) {
 		  /call check_Ready "hotSpells2D" ${s}
@@ -261,13 +548,18 @@ SUB hot_importantBots
         }
 		  }
 		}
-    }
-    /next s
-  /next t
+    	}
+    	/next s
+  	/next t
 
   /if (${Bool[${currentBot}]}) {
-    /varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_HotImportantBotStack
+    /varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_TankAndXTargetNeedHeal
     /call e3_Cast ${NetBots[${currentBot}].ID} "hotSpells2D" ${currentSpellIndx}
+	|-Our cast may have been interrupted so need to do a quick check on heals
+	/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+		/call heal_tanks
+		/call heal_xtargets
+	}
   }
 /if (${Debug} || ${Debug_Heals}) /echo <== hot_importantBots -|
 /RETURN
@@ -284,13 +576,12 @@ SUB hot_Allbots
 	/declare s int local 1
 	
 	|Randomly Iterate forward or backwards to reduce overheal
-  /if (${Math.Rand[2]}==0) {
+
     /for t 1 to ${NetBots.Counts}
-  } else {
-    /for t ${NetBots.Counts} downto 1
-  }
-	/varset currClient ${NetBots.Client[${t}]}
+	 	/if (${NetBots.Counts}==0) /break
+		/varset currClient ${NetBots.Client[${t}]}
 		/for s 1 to ${hotSpells2D.Size[1]}
+ 			/if (${hotSpells2D.Size[1]}==0) /break
 			/if (${Bool[${NetBots[${currClient}].InZone}]} && ${NetBots[${currClient}].PctHPs} <= ${hotSpells2D[${s},${iHealPct}]}) {
 				/call check_HotAllStack "${currClient}" ${hotSpells2D[${s},${iSpellID}]}
 				/if (${c_SubToRun}) {
@@ -311,9 +602,13 @@ SUB hot_Allbots
 	/next t
 	
 	/if (${Bool[${currentBot}]}) {
-		/varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_HotAllStack
-		/call e3_Cast ${NetBots[${currentBot}].ID} "hotSpells2D" ${currentSpellIndx}	
+		/varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_TankAndXTargetNeedHeal
+		/call e3_Cast ${NetBots[${currentBot}].ID} "hotSpells2D" ${currentSpellIndx}
 |		/call set_RecentHealTimer "${hotSpells2D[${s},${iCastType}]}"
+		/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+				/call heal_tanks
+				/call heal_xtargets
+		}
 	}	
 /if (${Debug} || ${Debug_Heals}) /echo <== hot_Allbots -|
 /RETURN
@@ -328,9 +623,11 @@ SUB hot_pets
   /declare t int local
   /declare s int local
   /for t 1 to ${petOwners.Size}
+ 	/if (${petOwners.Size}==0) /break
 |/echo ${petOwners[${t}]} ${Spawn[pc =${petOwners[${t}]}].Pet.Name} hp ${NetBots[${petOwners[${t}]}].PetHP}
 		/if (${Bool[${NetBots[${petOwners[${t}]}].InZone}]} && ${Spawn[pc =${petOwners[${t}]}].Pet.ID}) {
       /for s 1 to ${hotSpells2D.Size[1]}
+ 		/if (${hotSpells2D.Size[1]}==0) /break
       /if (${NetBots[${petOwners[${t}]}].PetHP} <= ${hotSpells2D[${s},${iHealPct}]}) {
         /call check_HotPetStack "${petOwners[${t}]}" ${hotSpells2D[${s},${iSpellID}]}
         /if (${c_SubToRun}) {
@@ -352,8 +649,15 @@ SUB hot_pets
   /next t
   |/echo ${currentBot} ${Spawn[pc =${currentBot}].Pet.ID} ${Spawn[pc =${currentBot}].Pet.Name}
   /if (${Bool[${currentBot}]}) {
-    /varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_HotPetStack
+    /varset hotSpells2D[${currentSpellIndx},${iSubToRun}] check_TankAndXTargetNeedHeal
     /call e3_Cast ${NetBots[${currentBot}].PetID} "hotSpells2D" ${currentSpellIndx}
+
+	|-Our cast may have been interrupted so need to do a quick check on heals
+	/if (${castReturn.Equal[CAST_INTERRUPTED]}) {
+		/call heal_tanks
+		/call heal_xtargets
+	}
+
   }
 /if (${Debug} || ${Debug_Heals}) /echo <== hot_pets -|
 /RETURN
@@ -363,6 +667,7 @@ SUB hot_pets
 |------------------------------------------------|
 SUB check_HotTankStack(targetName, spellID)
 	/varset c_SubToRun TRUE
+	
 	/declare i int local
 	/if (!${Defined[targetName]}) {
 		/declare targShortBuff string local ${NetBots[${Target.CleanName}].ShortBuff.Replace[ ,,]}
@@ -373,6 +678,7 @@ SUB check_HotTankStack(targetName, spellID)
 	  /varset c_SubToRun FALSE
   } else {
     /for i 1 to ${hotTankNoStack.Size}
+ /if (${hotTankNoStack.Size}==0) /break
       /if (${Select[${hotTankNoStack[${i}]},${targShortBuff}]}) /varset c_SubToRun FALSE
     /next i
 	}
@@ -393,6 +699,7 @@ SUB check_HotImportantBotStack(targetName, spellID)
     /varset c_SubToRun FALSE
   } else {
     /for i 1 to ${hotImportantNoStack.Size}
+ /if (${hotImportantNoStack.Size}==0) /break
       /if (${Select[${hotImportantNoStack[${i}]},${targShortBuff}]}) /varset c_SubToRun FALSE
     /next i
   }
@@ -403,6 +710,7 @@ SUB check_HotImportantBotStack(targetName, spellID)
 |------------------------------------------------|
 SUB check_HotAllStack(targetName, spellID)
 	/varset c_SubToRun TRUE
+
 	/declare i int local
 	/if (!${Defined[targetName]}) {
 		/declare targShortBuff string local ${NetBots[${Target.CleanName}].ShortBuff.Replace[ ,,]}
@@ -413,6 +721,7 @@ SUB check_HotAllStack(targetName, spellID)
     /varset c_SubToRun FALSE
   } else {
     /for i 1 to ${hotAllNoStack.Size}
+ /if (${hotAllNoStack.Size}==0) /break
       /if (${Select[${hotAllNoStack[${i}]},${targShortBuff}]}) /varset c_SubToRun FALSE
     /next i
   }
@@ -423,6 +732,7 @@ SUB check_HotAllStack(targetName, spellID)
 |------------------------------------------------|
 SUB check_HotPetStack(targetName, spellID)
   /varset c_SubToRun TRUE
+
   /declare i int local
   /if (!${Defined[targetName]}) {
     /declare targShortBuff string local ${NetBots[${Target.CleanName}].PetBuff.Replace[ ,,]}
@@ -433,6 +743,7 @@ SUB check_HotPetStack(targetName, spellID)
     /varset c_SubToRun FALSE
   } else {
     /for i 1 to ${hotAllNoStack.Size}
+ /if (${hotAllNoStack.Size}==0) /break
       /if (${Select[${hotAllNoStack[${i}]},${targShortBuff}]}) /varset c_SubToRun FALSE
     /next i
   }
@@ -443,30 +754,406 @@ SUB check_HotPetStack(targetName, spellID)
 |- Checks while casting tank heals		-|
 |----------------------------------------|
 SUB check_HealTankCasting
-	/varset c_SubToRun FALSE
-	/if (${castEndTime} > ${interruptTankCastSec} || ${Spawn[id ${Target.ID}].PctHPs} < ${interruptHealPct}) /varset c_SubToRun TRUE
-  |/echo cth ${Target.CleanName} nb ${NetBots[${Target.CleanName}].PctHPs} s ${Spawn[${Target.CleanName}].PctHPs} cet ${castEndTime} ${passCheck} ${interruptTankCastSec}
+	/varset c_SubToRun TRUE
+	/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+		/echo [${Time}]: check_HealTankCasting target above threshold for heals, setting interrupt flag
+		/varset c_SubToRun FALSE
+	}
 /RETURN
+
+|--------------------------------------------------|
+|- Used with determental spells to interrupt	  -|
+|--------------------------------------------------|
+SUB check_HealCasting_DuringDetrimental
+	/varset c_SubToRun TRUE
+	|/echo called check_HealTankCasting_DuringDetrimental
+	|First check the tank heals
+	/declare currentBot string local NULL
+	/declare currentSpellIndx int local
+	/declare xtargetIndex int local NULL
+	/declare numXTargets int local 13
+	/declare t int local
+	/declare s int local	
+	/declare buffCheckForName	string local
+	/declare buffCheckForID int local -1
+	/if (${healTanks}) {
+		|/echo check_HealTankCasting_DuringDetrimental checking tank heals
+		/for t 1 to ${tanks.Size}
+ 			/if (${tanks.Size}==0) /break
+			/for s 1 to ${tankHeals2D.Size[1]}
+ 				/if (${tankHeals2D.Size[1]}==0) /break
+				/varset buffCheckForID ${tankHeals2D[${s},${iCheckForID}]}
+				/if (${buffCheckForID}>0) {
+					|have heal buff to check for
+					/if (${Bool[${NetBots[${tanks[${t}]}].Buff.Find[${buffCheckForID}]}]}	|| ${Bool[${NetBots[${tanks[${t}]}].ShortBuff.Find[${buffCheckForID} ]}]}) {
+						|cannot use this as buff exists
+						|/echo [${Time}] <heal_tanks> skipping heal as buff is found ${tankHeals2D[${s},${iCastName}]} for buffid: ${buffCheckForID}
+						/goto :skipHeal
+					}
+				}
+				|/echo Tank HP ${NetBots[${tanks[${t}]}].PctHPs} vs configured ${tankHeals2D[${s},${iHealPct}]}
+				/if (${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${tankHeals2D[${s},${iHealPct}]}) {
+					|interrupt any determenal spell if casting if we are supposed to be healing		
+					/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
+						
+						/varset currentBot ${tanks[${t}]}
+						/varset currentSpellIndx ${s}
+					}
+				}
+				:skipHeal
+		/if (${Bool[${currentBot}]}) /break
+		/next s
+		/if (${Bool[${currentBot}]}) /break
+	/next t
+
+		/if (${Bool[${currentBot}]}) {
+			/echo [${Time}]: check_HealCasting_DuringDetrimental tank setting interrupt flag
+			/varset c_SubToRun FALSE
+			/RETURN
+		}	
+		|/echo check_HealCasting_DuringDetrimental no target found
+	}
+
+	/if (${healImportant}) {
+		/for t 1 to ${importantBots.Size}
+ 			/if (${importantBots.Size}==0) /break
+			/for s 1 to ${importantHeals2D.Size[1]}
+ 				/if (${importantHeals2D.Size[1]}==0) /break
+				/varset buffCheckForID ${importantHeals2D[${s},${iCheckForID}]}
+				/if (${buffCheckForID}>0) {
+					|have heal buff to check for
+					/if (${Bool[${NetBots[${importantBots[${t}]}].Buff.Find[${buffCheckForID}]}]}	|| ${Bool[${NetBots[${importantBots[${t}]}].ShortBuff.Find[${buffCheckForID} ]}]}) {
+						|cannot use this as buff exists
+						|/echo [${Time}] <heal_tanks> skipping heal as buff is found ${importantHeals2D[${s},${iCastName}]} for buffid: ${buffCheckForID}
+						/continue
+					}
+				}
+				/if (${Bool[${NetBots[${importantBots[${t}]}].InZone}]} && ${NetBots[${importantBots[${t}]}].PctHPs} <= ${importantHeals2D[${s},${iHealPct}]}) {
+					/if (${importantHeals2D[${s},${iIfs}]}) {
+						/if (${check_Mana["importantHeals2D",${s}]}) {
+							/if (!${Bool[${currentBot}]} || ${NetBots[${importantBots[${t}]}].PctHPs} < ${NetBots[${currentBot}].PctHPs}) {
+							/varset currentBot ${importantBots[${t}]}
+							/varset currentSpellIndx ${s}
+							}
+						}
+					}
+				}
+			/next s
+		/next t
+		/if (${Bool[${currentBot}]}) {
+			/echo [${Time}]: check_HealCasting_DuringDetrimental important bot setting interrupt flag
+			/varset c_SubToRun FALSE
+			/RETURN
+		}
+
+	}
+
+	/if (${healXTargets}) {
+			/for xtargetIndex 1 to ${numXTargets}
+ 				/if (${numXTargets}==0) /break
+		
+				/if (${Me.XTarget[${xtargetIndex}].TargetType.Equal[Specific PC]} ) {
+					/for s 1 to ${xtargetHeals2D.Size[1]}
+ 						/if (${xtargetHeals2D.Size[1]}==0) /break
+						/if (${Me.XTarget[${xtargetIndex}].PctHPs} < ${xtargetHeals2D[${s},${iHealPct}]}) {
+							/if (${xtargetHeals2D[${s},${iIfs}]}) {
+								/if (${check_Distance[${Me.XTarget[${xtargetIndex}].ID},${xtargetHeals2D[${s},${iMyRange}]}]}) {
+									/if (${check_Mana["xtargetHeals2D",${s}]}) {
+										/if (!${Bool[${currentBot}]} || ${Me.XTarget[${xtargetIndex}].PctHPs} < ${Me.XTarget[${currentBot}].PctHPs}) {
+											|/echo Setting xtarget to heal ${Me.XTarget[${xtargetIndex}].Name}
+											/varset currentBot ${xtargetIndex}
+											/varset currentSpellIndx ${s}
+										}
+									}
+								}
+							}
+					}
+				/next s
+			}
+		/next xtargetIndex
+
+		/if (${Bool[${currentBot}]}) {
+			/echo [${Time}]: check_HealCasting_DuringDetrimental xtarget setting interrupt flag
+			/varset c_SubToRun FALSE
+			/RETURN
+		}
+	}
+
+	|/echo check_HealCasting_DuringDetrimental no target found
+
+/RETURN
+
+
+|--------------------------------------------------|
+|- Used with determental spells to interrupt	  -|
+|--------------------------------------------------|
+SUB check_HealCasting_DuringBurns
+	/varset c_SubToRun TRUE
+	|/echo called check_HealTankCasting_DuringDetrimental
+	|First check the tank heals
+	/declare currentBot string local NULL
+	/declare currentSpellIndx int local
+	/declare xtargetIndex int local NULL
+	/declare numXTargets int local 13
+	/declare t int local
+	/declare s int local	
+
+	/if (${healTanks}) {
+		|/echo check_HealTankCasting_DuringDetrimental checking tank heals
+		/for t 1 to ${tanks.Size}
+ 			/if (${tanks.Size}==0) /break
+			/for s 1 to ${tankHeals2D.Size[1]}
+ 				/if (${tankHeals2D.Size[1]}==0) /break
+				|/echo Tank HP ${NetBots[${tanks[${t}]}].PctHPs} vs configured ${tankHeals2D[${s},${iHealPct}]}
+				/if (${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${tankHeals2D[${s},${iHealPct}]}) {
+					|interrupt any determenal spell if casting if we are supposed to be healing		
+					/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
+						
+						/varset currentBot ${tanks[${t}]}
+						/varset currentSpellIndx ${s}
+					}
+				}
+		/if (${Bool[${currentBot}]}) /break
+		/next s
+		/if (${Bool[${currentBot}]}) /break
+	/next t
+
+		/if (${Bool[${currentBot}]}) {
+		
+			/varset c_SubToRun FALSE
+			/RETURN
+		}	
+		
+	}
+
+	/if (${healImportant}) {
+		/for t 1 to ${importantBots.Size}
+ 			/if (${importantBots.Size}==0) /break
+			/for s 1 to ${importantHeals2D.Size[1]}
+ 				/if (${importantHeals2D.Size[1]}==0) /break
+				/if (${Bool[${NetBots[${importantBots[${t}]}].InZone}]} && ${NetBots[${importantBots[${t}]}].PctHPs} <= ${importantHeals2D[${s},${iHealPct}]}) {
+					/if (${importantHeals2D[${s},${iIfs}]}) {
+						/if (${check_Mana["importantHeals2D",${s}]}) {
+							/if (!${Bool[${currentBot}]} || ${NetBots[${importantBots[${t}]}].PctHPs} < ${NetBots[${currentBot}].PctHPs}) {
+							/varset currentBot ${importantBots[${t}]}
+							/varset currentSpellIndx ${s}
+							}
+						}
+					}
+				}
+			/next s
+		/next t
+		/if (${Bool[${currentBot}]}) {
+			/varset c_SubToRun FALSE
+			/RETURN
+		}
+
+	}
+
+	/if (${healXTargets}) {
+	
+			/for xtargetIndex 1 to ${numXTargets}
+ 				/if (${numXTargets}==0) /break
+		
+				/if (${Me.XTarget[${xtargetIndex}].TargetType.Equal[Specific PC]} ) {
+				/for s 1 to ${xtargetHeals2D.Size[1]}
+					 /if (${xtargetHeals2D.Size[1]}==0) /break
+					/if (${Me.XTarget[${xtargetIndex}].PctHPs} < ${xtargetHeals2D[${s},${iHealPct}]}) {
+						/if (${xtargetHeals2D[${s},${iIfs}]}) {
+							/if (${check_Distance[${Me.XTarget[${xtargetIndex}].ID},${xtargetHeals2D[${s},${iMyRange}]}]}) {
+								/if (${check_Mana["xtargetHeals2D",${s}]}) {
+									/if (!${Bool[${currentBot}]} || ${Me.XTarget[${xtargetIndex}].PctHPs} < ${Me.XTarget[${currentBot}].PctHPs}) {
+										
+										/varset currentBot ${xtargetIndex}
+										/varset currentSpellIndx ${s}
+									}
+								}
+							}
+						}
+					}
+				/next s
+			}
+		/next xtargetIndex
+
+		/if (${Bool[${currentBot}]}) {
+				/varset c_SubToRun FALSE
+			/RETURN
+		}
+	}
+
+
+/RETURN
+|---------------------------------------------------------------------------|
+|- Used with heals spells to interrupt so that we can heal tanks/xtargets  -|
+|---------------------------------------------------------------------------|
+SUB check_TankAndXTargetNeedHeal(ArrayName)
+
+	/declare currentBot string local NULL
+	/declare currentSpellIndx int local
+	/declare xtargetIndex int local NULL
+	/declare numXTargets int local 13
+	/declare t int local
+	/declare s int local	
+
+	/varset c_SubToRun TRUE
+	 /if (!${Select[${ArrayName},hotSpells2D]}) {
+
+		/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+			/echo [${Time}]: check_TankAndXTargetNeedHeal target above threshold for heals, setting interrupt flag
+			/varset c_SubToRun FALSE
+			/return
+		}
+	 }
+	/if (${healTanks}) {
+		|/echo check_HealTankCasting_DuringDetrimental checking tank heals
+		/for t 1 to ${tanks.Size}
+ 				/if (${tanks.Size}==0) /break
+				/for s 1 to ${tankHeals2D.Size[1]}
+ 					/if (${tankHeals2D.Size[1]}==0) /break
+				|/echo Tank HP ${NetBots[${tanks[${t}]}].PctHPs} vs configured ${tankHeals2D[${s},${iHealPct}]}
+				/if (${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${tankHeals2D[${s},${iHealPct}]}) {
+					|interrupt any determenal spell if casting if we are supposed to be healing		
+					/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
+						
+						/varset currentBot ${tanks[${t}]}
+						/varset currentSpellIndx ${s}
+						/goto :endTankCheck
+					}
+				}
+			/next s
+		/next t
+		:endTankCheck
+		/if (${Bool[${currentBot}]}) {
+			/echo [${Time}]: check_TankAndXTargetNeedHeal tank needs heal setting interrupt flag
+			/varset c_SubToRun FALSE
+			/return
+		}	
+		|/echo check_HealCasting_DuringDetrimental no target found
+	}
+	/if (${healXTargets}) {
+	
+		
+			/for xtargetIndex 1 to ${numXTargets}
+ 				/if (${numXTargets}==0) /break
+		
+			/if (${Me.XTarget[${xtargetIndex}].TargetType.Equal[Specific PC]} ) {
+				/for s 1 to ${xtargetHeals2D.Size[1]}
+ 				/if (${xtargetHeals2D.Size[1]}==0) /break
+					/if (${Me.XTarget[${xtargetIndex}].PctHPs} < ${xtargetHeals2D[${s},${iHealPct}]}) {
+						/if (${xtargetHeals2D[${s},${iIfs}]}) {
+							/if (${check_Distance[${Me.XTarget[${xtargetIndex}].ID},${xtargetHeals2D[${s},${iMyRange}]}]}) {
+								/if (${check_Mana["xtargetHeals2D",${s}]}) {
+									/if (!${Bool[${currentBot}]} || ${Me.XTarget[${xtargetIndex}].PctHPs} < ${Me.XTarget[${currentBot}].PctHPs}) {
+										|/echo Setting xtarget to heal ${Me.XTarget[${xtargetIndex}].Name}
+										/varset currentBot ${xtargetIndex}
+										/varset currentSpellIndx ${s}
+									}
+								}
+							}
+						}
+					}
+				/next s
+			}
+		/next xtargetIndex
+
+		/if (${Bool[${currentBot}]}) {
+			/echo [${Time}]: check_TankAndXTargetNeedHeal xtarget setting interrupt flag
+			/varset c_SubToRun FALSE
+			/return
+		}
+	}
+/Return
+
+
+|---------------------------------------------------------------------------|
+|- Used with heals spells to interrupt so that we can heal tanks		   -|
+|---------------------------------------------------------------------------|
+SUB check_TankNeedHeal
+
+	/declare currentBot string local NULL
+	/declare currentSpellIndx int local
+	/declare xtargetIndex int local NULL
+	/declare numXTargets int local 13
+	/declare t int local
+	/declare s int local	
+
+	/varset c_SubToRun TRUE
+
+
+	/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+		/echo [${Time}]: check_TankNeedHeal target above threshold for heals, setting interrupt flag
+		/varset c_SubToRun FALSE
+		/return
+	}
+	/if (${healTanks}) {
+		|/echo check_HealTankCasting_DuringDetrimental checking tank heals
+		/for t 1 to ${tanks.Size}
+ 			/if (${tanks.Size}==0) /break
+			/for s 1 to ${tankHeals2D.Size[1]}
+ 				/if ( ${tankHeals2D.Size[1]}==0) /break
+				|/echo Tank HP ${NetBots[${tanks[${t}]}].PctHPs} vs configured ${tankHeals2D[${s},${iHealPct}]}
+				/if (${Bool[${NetBots[${tanks[${t}]}].InZone}]} && ${NetBots[${tanks[${t}]}].PctHPs} <= ${tankHeals2D[${s},${iHealPct}]}) {
+					|interrupt any determenal spell if casting if we are supposed to be healing		
+					/if (${check_Distance[${NetBots[${tanks[${t}]}].ID},${tankHeals2D[${s},${iMyRange}]}]}) {
+						
+						/varset currentBot ${tanks[${t}]}
+						/varset currentSpellIndx ${s}
+					}
+				}
+		/if (${Bool[${currentBot}]}) /break
+		/next s
+		/if (${Bool[${currentBot}]}) /break
+	/next t
+
+		/if (${Bool[${currentBot}]}) {
+			/echo [${Time}]: check_TankNeedHeal tank needs heal setting interrupt flag
+			/varset c_SubToRun FALSE
+			/RETURN
+		}	
+		|/echo check_HealCasting_DuringDetrimental no target found
+	}
+	
+/Return
 |----------------------------------------|
 |- Checks while casting important heals	-|
 |----------------------------------------|
 SUB check_HealImportantCasting
-	/varset c_SubToRun FALSE
-	/if (${castEndTime} > ${interruptImportantCastSec} || ${Spawn[id ${Target.ID}].PctHPs} < ${interruptHealPct}) /varset c_SubToRun TRUE
+	/varset c_SubToRun TRUE
+	/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+		/echo [${Time}]: check_HealImportantCasting target above threshold for heals, setting interrupt flag
+		/varset c_SubToRun FALSE
+	}
+	
 /RETURN
 |----------------------------------------|
 |- Checks while casting all heals		-|
 |----------------------------------------|
 SUB check_HealAllCasting
-	/varset c_SubToRun FALSE
-	/if (${castEndTime} > ${interruptAllCastSec} || ${Spawn[id ${Target.ID}].PctHPs} < ${interruptHealPct}) /varset c_SubToRun TRUE
+	/varset c_SubToRun TRUE
+	/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+		/echo [${Time}]: check_HealAllCasting target above threshold for heals, setting interrupt flag
+		/varset c_SubToRun FALSE
+	}
 /RETURN
 |----------------------------------------|
-|- Checks while casting all heals		-|
+|- Checks while casting xtarget heals	-|
+|----------------------------------------|
+SUB check_HealXTargetCasting
+	/varset c_SubToRun TRUE
+	/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+		/echo [${Time}]: check_HealXTargetCasting target above threshold for heals, setting interrupt flag
+		/varset c_SubToRun FALSE
+	}
+/RETURN
+|----------------------------------------|
+|- Checks while casting pet heals		-|
 |----------------------------------------|
 SUB check_HealPetCasting
-	/varset c_SubToRun FALSE
-	/if (${castEndTime} > ${interruptAllCastSec} || ${Spawn[id ${Target.ID}].PctHPs} < ${interruptHealPct}) /varset c_SubToRun TRUE
+	/varset c_SubToRun TRUE
+	/if (${Spawn[id ${Target.ID}].PctHPs} > ${interruptHealPct}) {
+		/echo [${Time}]: check_HealPetCasting target above threshold for heals, setting interrupt flag
+		/varset c_SubToRun FALSE
+	}
 /RETURN
 
 |-------------------------------------------|
@@ -493,6 +1180,7 @@ SUB check_HealGroupCasting(ArrayName, int ArrayIndex)
 	/if (${Me.PctHPs} <= ${${ArrayName}[${ArrayIndex},${iHealPct}]}) /varset numLowHp 1
 	| Check range of group members, count number below pcthp and add their healths together.
 	/for g 1 to ${Group}
+ /if (${Group}==0) /break
     /if (${check_Distance[${Group.Member[${g}].ID},${${ArrayName}[${ArrayIndex},${iMyRange}]}]}) {
 			/varcalc targetCount ${targetCount} + 1
 			/varcalc avgGrpHealth ${avgGrpHealth} + ${NetBots[${Group.Member[${g}]}].PctHPs}
@@ -517,6 +1205,7 @@ SUB groupHeals
 		/declare s int local
 		
 		/for s 1 to ${groupHeals2D.Size[1]}
+ 			/if (${groupHeals2D.Size[1]}==0) /break
 			/call check_HealGroupCasting "groupHeals2D" ${s}
 			/if (${c_SubToRun}) {
         /if (${check_Mana["groupHeals2D",${s}]}) {
@@ -547,9 +1236,13 @@ SUB heal_Setup
 	| 8493 Elixir of Divinity	- 900/tick
 	| 5416 Spiritual Serenity	- 820/tick
 	| 8503 Ghost of Renewal		- 630/tick	
-	/declare hotTankNoStackStr		string outer 5259,8493
-	/declare hotImportantNoStackStr	string outer 5259,8493,5416,8503
-	/declare hotAllNoStackStr		string outer 5259,8493,5416,8503
+	| 32493 Convergence of Spirits
+	| 21818 Peaceful Convergence of Spirits
+	| 38061 Union of Spirits
+	| 16200 Focused Celestial Regeneration
+	/declare hotTankNoStackStr		string outer 32493,21818,38061,16200,16201,16202,16514,16515,16516
+	/declare hotImportantNoStackStr	string outer 32493,21818,38061,16200,16201,16202,16514,16515,16516
+	/declare hotAllNoStackStr		string outer 32493,21818,38061,16200,16201,16202,16514,16515,16516
 	|~~~~~~~~~~~~~~~~~~~ PCTHps Interrupt	~~~~~~~~~~~~~~~~~~~~~~~~|
 	|~~~~~~~~~~~~ Interrupt heal if target >= this PCTHps ~~~~~~~~~~|
 	/declare interruptHealPct			int outer 95
@@ -557,16 +1250,21 @@ SUB heal_Setup
 	/declare interruptTankCastSec		int outer 3
 	/declare interruptImportantCastSec	int outer 18
 	/declare interruptAllCastSec		float outer 25
-
+	/declare interruptXTargetCastSec	int outer 18
+	
   /declare do_GroupHeals bool outer FALSE
   /declare healTanks bool outer FALSE
   /declare healImportant bool outer FALSE
   /declare healAll bool outer FALSE
+  /declare healXTargets bool outer FALSE
   /declare healPets bool outer FALSE
   /declare hotTanks bool outer FALSE
   /declare hotImportant bool outer FALSE
   /declare hotAll bool outer FALSE
   /declare hotPets bool outer FALSE
+  /declare UseNecroHealOrbs bool outer FALSE
+
+
 
   /call ListToArray "hotTankNoStack"		  "${hotTankNoStackStr}"		  ","
   /call ListToArray "hotImportantNoStack" "${hotImportantNoStackStr}" ","
@@ -593,9 +1291,11 @@ SUB heal_SpellArrays
     /call IniToArrayV "${Character_Ini},Heals,Tank Heal#"             tankHeals
     /call IniToArrayV "${Character_Ini},Heals,Important Heal#"        importantHeals
     /call IniToArrayV "${Character_Ini},Heals,All Heal#"              allHeals
+	/call IniToArrayV "${Character_Ini},Heals,XTarget Heal#"              xtargetHeals
     /call IniToArrayV "${Character_Ini},Heals,Pet Heal#"              petHeals
     /call IniToArrayV "${Character_Ini},Heals,Heal Over Time Spell#"  hotSpells
     /call IniToArrayV "${Character_Ini},Heals,Group Heal#"            groupHeals
+	/if (${Bool[${Ini[${Character_Ini},Heals,Auto Cast Necro Heal Orbs (On/Off)]}]}) /call iniToVarV "${Character_Ini},Heals,Auto Cast Necro Heal Orbs (On/Off)" UseNecroHealOrbs bool outer
   }
 |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
 | lets healers break invis to cast heal
@@ -609,6 +1309,7 @@ SUB heal_SpellArrays
     /if (${WhoToHeal.Find[Tanks]} && ${Defined[tanks]} && ${Defined[tankHeals]})		                  /varset healTanks			TRUE
     /if (${WhoToHeal.Find[ImportantBots]} && ${Defined[importantBots]} && ${Defined[importantHeals]}) /varset healImportant	TRUE
     /if (${WhoToHeal.Find[All]} && ${Defined[allHeals]})										                          /varset healAll			  TRUE
+	/if (${WhoToHeal.Find[XTarget]} && ${Defined[healXTargets]})										                          /varset healXTargets			  TRUE
     /if (${WhoToHeal.Find[Pets]} && ${Defined[petOwners]} && ${Defined[petHeals]}) 		                /varset healPets			TRUE
   }
   /if (${Defined[WhoToHoT]}) {
@@ -623,6 +1324,7 @@ SUB heal_SpellArrays
   /if (${healTanks})				    /call BuildSpellArray "tankHeals" 		  "tankHeals2D"
   /if (${healImportant})			  /call BuildSpellArray "importantHeals"	"importantHeals2D"
   /if (${healAll})				      /call BuildSpellArray "allHeals" 		    "allHeals2D"
+  /if (${healXTargets})				  /call BuildSpellArray "xtargetHeals" 		    "xtargetHeals2D"
   /if (${healPets})				      /call BuildSpellArray "petHeals" 		    "petHeals2D"
   /if (${Defined[hotSpells]})		/call BuildSpellArray "hotSpells" 		  "hotSpells2D"
   /if (${Defined[lifeSupport]})	/call BuildSpellArray "lifeSupport" 	  "lifeSupport2D"
@@ -631,30 +1333,43 @@ SUB heal_SpellArrays
   /declare i int local
   /if (${do_GroupHeals}) {
     /for i 1 to ${groupHeals2D.Size[1]}
+ /if (${groupHeals2D.Size[1]}==0) /break
     /varset groupHeals2D[${i},${iSubToRun}] check_HealGroupCasting
     /varset groupHeals2D[${i},${iCastInvis}] ${castGroupHealWhileInvis}
     /next i
   }
   /if (${healTanks}) {
     /for i 1 to ${tankHeals2D.Size[1]}
+ /if (${tankHeals2D.Size[1]}==0) /break
     /varset tankHeals2D[${i},${iSubToRun}] check_HealTankCasting
     /varset tankHeals2D[${i},${iCastInvis}] ${castTankHealWhileInvis}
     /next i
   }
   /if (${healImportant}) {
     /for i 1 to ${importantHeals2D.Size[1]}
+ /if (${importantHeals2D.Size[1]}==0) /break
     /varset importantHeals2D[${i},${iSubToRun}] check_HealImportantCasting
     /varset importantHeals2D[${i},${iCastInvis}] ${castImportantHealWhileInvis}
     /next i
   }
   /if (${healAll}) {
     /for i 1 to ${allHeals2D.Size[1]}
+ /if (${allHeals2D.Size[1]}==0) /break
     /varset allHeals2D[${i},${iSubToRun}] check_HealAllCasting
     /varset allHeals2D[${i},${iCastInvis}] ${castAllHealWhileInvis}
     /next i
   }
+  /if (${healXTargets}) {
+    /for i 1 to ${xtargetHeals2D.Size[1]}
+ 		/if (${xtargetHeals2D.Size[1]}==0) /break
+		/varset xtargetHeals2D[${i},${iSubToRun}] check_HealXTargetCasting
+		| Don't heal while invis
+		/varset xtargetHeals2D[${i},${iCastInvis}] FALSE
+    /next i
+  }
   /if (${healPets}) {
     /for i 1 to ${petHeals2D.Size[1]}
+ /if (${petHeals2D.Size[1]}==0) /break
     /varset petHeals2D[${i},${iSubToRun}] check_HealPetCasting
     /next i
   }
@@ -676,7 +1391,9 @@ SUB heal_CharacterSettings
 		/call WriteToIni "${Character_Ini},Heals,Tank Heal"
 		/call WriteToIni "${Character_Ini},Heals,Important Heal"
 		/call WriteToIni "${Character_Ini},Heals,All Heal"
+		/call WriteToIni "${Character_Ini},Heals,XTarget Heal"
 		/call WriteToIni "${Character_Ini},Heals,Pet Heal"
+		/call WriteToIni "${Character_Ini},Heals,Auto Cast Necro Heal Orbs (On/Off)" "On"
     /if (${Select[${Me.Class.ShortName},CLR,DRU,PAL,SHM]}) /call WriteToIni "${Character_Ini},Heals,Heal Over Time Spell"
     /if (${Select[${Me.Class.ShortName},CLR,DRU,PAL]})	/call WriteToIni "${Character_Ini},Heals,Group Heal"
     |/if (${Select[${Me.Class.ShortName},CLR,SHM]}) /call WriteToIni "${Character_Ini},Heals,;Group Hot" "Not Implemented"

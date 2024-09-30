@@ -14,13 +14,13 @@
 |- Adds items from you inventory to your Loot_Ini.	-|
 |----------------------------------------------------|
 #EVENT syncInventory "<#*#> Inventory Items"
-#EVENT syncInventory "[MQ2] Inventory Items"
+#EVENT syncInventory "Inventory Items"
 #EVENT syncInventory "<#*#> Update Loot.ini"
-#EVENT syncInventory "[MQ2] Update Loot.ini"
+#EVENT syncInventory "Update Loot.ini"
 #EVENT syncInventory "<#*#> Sync Inventory"
-#EVENT syncInventory "[MQ2] Sync Inventory"
+#EVENT syncInventory "Sync Inventory"
 #EVENT syncInventory "<#*#> Sync Loot.ini"
-#EVENT syncInventory "[MQ2] Sync Loot.ini"
+#EVENT syncInventory "Sync Loot.ini"
 SUB EVENT_syncInventory
 /if (${Debug} || ${Debug_Sell}) /echo |- event_inventoryItems ==>
 	
@@ -31,6 +31,7 @@ SUB EVENT_syncInventory
 
 	| Check inventory slots 1 - ${numInventorySlots} for items, and containers.
 	/for i 1 to ${numInventorySlots}
+ /if (${numInventorySlots}==0) /break
 	
 		| If there is an item in inventory slot ${i}
 		/if (${Bool[${InvSlot[pack${i}].Item}]}) {
@@ -40,6 +41,7 @@ SUB EVENT_syncInventory
 			/if (${InvSlot[pack${i}].Item.Container}) {
 			
 				/for x 1 to ${InvSlot[pack${i}].Item.Container}
+ /if (${InvSlot[pack${i}].Item.Container}==0) /break
 			
 					/if (${Bool[${Me.Inventory[pack${i}].Item[${x}]}]}) /call get_lootSetting "pack${i}" "${x}"
 					
@@ -59,23 +61,14 @@ SUB EVENT_syncInventory
 |------------------------------------------------------------------------------------------------------------------------------------|
 |- Commands bots, including yourself, to open trade with the nearest merchant, and sell items flagged as [/Sell] in your Loot_Ini.	-|
 |------------------------------------------------------------------------------------------------------------------------------------|
-#EVENT sellItems "[MQ2] Sell Items"
+#EVENT sellItems "Sell Items"
 #EVENT sellItems "<#*#> Sell Items"
-#EVENT sellItems "[MQ2] AutoSell"
+#EVENT sellItems "AutoSell"
 #EVENT sellItems "<#*#> AutoSell"
-#EVENT sellItems "[MQ2] Auto Sell"
+#EVENT sellItems "Auto Sell"
 #EVENT sellItems "<#*#> Auto Sell"
 SUB EVENT_sellItems
 /if (${Debug} || ${Debug_Sell}) /echo |- EVENT_sellItems ==>
-	
-	    | Stop Bardswap
-    /declare bsstat bool local false
-    /if (${BardSwap.Swapping}) {
-            /BardSwap
-            /BardSwap melee
-            /varset bsstat true
-        }
-    }
 	
 	| Record starting location.
 	/declare startingLoc string local ${Me.Loc.Replace[ ,]}
@@ -109,13 +102,6 @@ SUB EVENT_sellItems
 		/echo I have finished selling.
 	}
 	
-		    | Restart Bardswap
-    /if (${bsstat}) {
-        /Bardswap
-        /BardSwap melee
-    }
-	
-	
 /if (${Debug} || ${Debug_Sell}) /echo <== EVENT_sellItems -|
 /RETURN
 
@@ -133,6 +119,7 @@ SUB openBags
 	/declare miscTimer timer local
 	
 	/for i 1 to ${numInventorySlots}
+ /if (${numInventorySlots}==0) /break
 		
 		/varset miscTimer 30
 		/if (${Me.Inventory[pack${i}].Container}) {
@@ -175,6 +162,7 @@ SUB closeBags
 	/declare miscTimer timer local
 	
 	/for i 1 to ${numInventorySlots}
+ /if (${numInventorySlots}==0) /break
 		
 		/varset miscTimer 30
 		/if (${Me.Inventory[pack${i}].Container}) {
@@ -282,6 +270,7 @@ SUB sellItems
 	
 	| Scan inventory for items to sell
 	/for i 1 to ${numInventorySlots}
+ /if (${numInventorySlots}==0) /break
 	
 		/if (${Bool[${Me.Inventory[pack${i}]}]}) {
 		
@@ -290,6 +279,7 @@ SUB sellItems
 			
 				| Look at each bag slot for items to sell
 				/for e 1 to ${Me.Inventory[pack${i}].Container}
+ 					/if (${Me.Inventory[pack${i}].Container}==0) /break
 				
 					/if (${Bool[${Me.Inventory[pack${i}].Item[${e}]}]}) {
 					
@@ -318,18 +308,16 @@ SUB sellItems
 								:retrySelect_Pack
 								/if (${Debug} || ${Debug_Sell}) /echo |- sellItems -| :retrySelect_Pack
 								/itemnotify in pack${i} ${e} leftmouseup
-								
-								/delay ${retryTimer} ${Window[MerchantWnd].Child[MW_SelectedItemLabel].Text.Equal[${Me.Inventory[pack${i}].Item[${e}]}]}
-					
+								/delay 3
 								| If the item was not selected
 								/if (!${Window[MerchantWnd].Child[MW_SelectedItemLabel].Text.Equal[${Me.Inventory[pack${i}].Item[${e}]}]}) {
 									
-									| If I have time, retry to select the item
-									/if (${retryTimer}) {
-										/goto :retrySelect_Pack
-									} else {
+									| Try again
+									/delay 3
+									/if (!${Window[MerchantWnd].Child[MW_SelectedItemLabel].Text.Equal[${Me.Inventory[pack${i}].Item[${e}]}]}) {
 										/echo ERROR: Failed to select [${Me.Inventory[pack${i}].Item[${e}]}], skipping.
 									}
+									
 								} else {
 						
 									| Check that the buy button is enabled
@@ -342,24 +330,25 @@ SUB sellItems
 						
 										| Sell the item
 										/varset retryTimer 30
-										/echo Selling [${Me.Inventory[pack${i}].Item[${e}]}].
+										/echo [${Time}] Selling from pack [${Me.Inventory[pack${i}].Item[${e}]}].
 										
 										:SellItem_Pack
 										/if (${Debug} || ${Debug_Sell}) /echo |- sellItems -| :SellItem_Pack
 										/notify MerchantWnd MW_Sell_Button leftmouseup
-										/delay ${retryTimer} ${Window[QuantityWnd].Open} || !${Bool[${Me.Inventory[pack${i}].Item[${e}]}]}
-						
+										/delay 1
 										| Close the quantity window
 										/if (${Window[QuantityWnd].Open}) {
 											/notify QuantityWnd QTYW_Accept_Button leftmouseup
-											/delay ${retryTimer} !${Window[QuantityWnd].Open}
-											/delay ${retryTimer} !${Bool[${Me.Inventory[pack${i}]}]}
+											/delay 3
+										} else {
+											|leave a total delay of 3 for client-server communication
+											/delay 2
 										}
-						
+
 										| If the item is still in my inventory
 										/if (${Bool[${Me.Inventory[pack${i}].Item[${e}]}]} && ${retryTimer}) {
-											/goto :SellItem
-										} else {
+											/goto :SellItem_Pack
+										} else /if (${Bool[${Me.Inventory[pack${i}].Item[${e}]}]}) {
 											/echo ERROR: Failed to sell [${Me.Inventory[pack${i}].Item[${e}]}], skipping.
 										}
 									}
@@ -399,17 +388,15 @@ SUB sellItems
 						/if (${Debug} || ${Debug_Sell}) /echo |- sellItems -| :retrySelect
 						/itemnotify in pack${i} leftmouseup
 						
-						/delay ${retryTimer} ${Window[MerchantWnd].Child[MW_SelectedItemLabel].Text.Equal[${Me.Inventory[pack${i}]}]}
-					
+						/delay 3
 						| If the item was not selected
 						/if (!${Window[MerchantWnd].Child[MW_SelectedItemLabel].Text.Equal[${Me.Inventory[pack${i}]}]}) {
 							
-							| If I have time, retry to select the item
-							/if (${retryTimer}) {
-								/goto :retrySelect
-							} else {
+							/delay 3
+							/if (!${Window[MerchantWnd].Child[MW_SelectedItemLabel].Text.Equal[${Me.Inventory[pack${i}]}]}) {
 								/echo ERROR: Failed to select [${Me.Inventory[pack${i}]}], skipping.
 							}
+							
 						} else {
 				
 							| Check that the buy button is enabled
@@ -422,24 +409,29 @@ SUB sellItems
 				
 								| Sell the item
 								/varset retryTimer 30
-								/echo Selling [${Me.Inventory[pack${i}]}].
+								/echo [${Time}] Selling from root [${Me.Inventory[pack${i}]}].
 								
 								:SellItem
 								/if (${Debug} || ${Debug_Sell}) /echo |- sellItems -| :SellItem
 								/notify MerchantWnd MW_Sell_Button leftmouseup
-								/delay ${retryTimer} ${Window[QuantityWnd].Open} || !${Bool[${Me.Inventory[pack${i}]}]}
-				
-								| Close the quantity window
+								|give it a moment to show the qty window
+								/delay 1
+								| Close the quantity window if it opened
+								:CheckQtyWindow
 								/if (${Window[QuantityWnd].Open}) {
 									/notify QuantityWnd QTYW_Accept_Button leftmouseup
-									/delay ${retryTimer} !${Window[QuantityWnd].Open}
-									/delay ${retryTimer} !${Bool[${Me.Inventory[pack${i}]}]}
+									/delay 3
+									/if (${Window[QuantityWnd].Open}) { 
+										/goto :CheckQtyWindow
+									}
+								} else {
+									|leave a total delay of 3 for client-server communication
+									/delay 2
 								}
-								
 								| If the item is still in my inventory
 								/if (${Bool[${Me.Inventory[pack${i}]}]} && ${retryTimer}) {
 									/goto :SellItem
-								} else {
+								} else /if (${Bool[${Me.Inventory[pack${i}]}]}) {
 									/echo ERROR: Failed to sell [${Me.Inventory[pack${i}]}], skipping.
 								}
 							}
@@ -467,10 +459,12 @@ SUB destroyItems
 	/declare badItem string local
 	
 	/for i 1 to ${DestroyableItems.Size}
+ /if (${DestroyableItems.Size}==0) /break
 	
 		/varset badItem ${DestroyableItems[${i}]}
 
 		/for e 1 to ${numInventorySlots}
+ /if (${numInventorySlots}==0) /break
 		
 			/if (!${Me.Inventory[pack${e}].Container}) {
 				
@@ -503,6 +497,7 @@ SUB destroyItems
 			} else {
 			
 				/for y 1 to ${Me.Inventory[pack${e}].Container}
+ /if (${Me.Inventory[pack${e}].Container}==0) /break
 				
 					/if (${badItem.Equal[${Me.Inventory[pack${e}].Item[${y}]}]}) {
 					

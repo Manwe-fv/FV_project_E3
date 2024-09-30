@@ -74,6 +74,7 @@ SUB ROG_MacroSettings
 	/if (${Debug}) /echo |- ROG_MacroSettings ==>
 	/call WriteToIni "${advSettings_Ini},ROG Functions,ROG Function#1" "check_Burns" 1
 	/call WriteToIni "${advSettings_Ini},ROG Functions,ROG Function#2" "check_Buffs" 1
+	/call WriteToIni "${advSettings_Ini},ROG Functions,ROG Function#3" "check_Food" 1
 	/if (${Debug}) /echo <== ROG_MacroSettings -|
 /RETURN
 |----------------------------------------------------------------------------|
@@ -93,5 +94,5 @@ Sub ROG_Aliases
 /return
 |----------------------------------------------------------------------------|
 Sub ROG_Background_Events
-	/if (${AutoHide} && !${Me.Invis} && !${Me.Moving} && ${Me.CombatState.NotEqual[COMBAT]}) /call AutoHide
+	/if (${AutoHide} && !${Me.Invis} && !${Me.Moving} && ${Me.CombatState.NotEqual[COMBAT]} && !${Select[${Zone.ID},202,151,386,152]}) /call AutoHide
 /return

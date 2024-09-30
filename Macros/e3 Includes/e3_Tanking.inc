@@ -13,7 +13,7 @@ SUB tankKill
   /if (${Bool[${AssistTarget}]}) {
     /varset tankKillEngaged TRUE
     /varset killTarget ${AssistTarget}
-    /varset doTaunt TRUE
+    |/varset doTaunt TRUE
     /squelch /turbo 100
   }
   /if (${tankKillEngaged}) {
@@ -23,7 +23,7 @@ SUB tankKill
     /if (${SpawnCount[npc playerstate 4 targetable radius 75 zradius 25 los]}==0 && ${Me.CombatState.NotEqual[COMBAT]}) {
       /echo No Npc in Range, exiting tankKill
       /varset tankKillEngaged FALSE
-      /varset doTaunt FALSE
+     | /varset doTaunt FALSE
       /squelch /turbo ${classTurbo}
       /return
     } else {
@@ -69,16 +69,16 @@ SUB peelTank
     /if (${Me.TargetOfTarget.Name.Equal[${Me}]}) {
       |if i had a former assist target and it is still alive/valid then change back to assisting
       /if (${peelTankOriginalAssistTarget} && ${Select[${Spawn[id ${peelTankOriginalAssistTarget}].Type},${AcceptableTargetTypes}]}) /varset AssistTarget ${peelTankOriginalAssistTarget}
-      /varset doTaunt FALSE
+      |/varset doTaunt FALSE
       /varset peelTarget 0
     } else {
       /if (${Me.CombatAbilityReady[Mock]}) {
         /doability Mock
-        /delay 2
+        /delay 3
       }
-      /if (${Me.CombatAbilityReady[Bazu Bellow]}) /doability "Bazu Bellow"
-      /if (${Me.AltAbilityReady[Divine Stun]}) /casting "Divine Stun"
-      /if (${Me.SpellReady[Terror of Discord]}) /casting "Terror of Discord"
+      /if (${Me.CombatAbilityReady[Bazu Bellow]}) /call castSimpleSpell "Bazu Bellow" 0
+      /if (${Me.AltAbilityReady[Divine Stun]}) /call castSimpleSpell "Divine Stun" 0
+      /if (${Me.SpellReady[Terror of Discord]}) /call castSimpleSpell "Terror of Discord" 0
     }
   }
 
@@ -88,6 +88,7 @@ SUB peelTank
   |Randomly Iterate forward or backwards
   /if (${Math.Rand[2]}==0) {
     /for t 1 to ${NetBots.Counts}
+ /if (${NetBots.Counts}==0) /break
   } else {
     /for t ${NetBots.Counts} downto 1
   }
@@ -97,22 +98,28 @@ SUB peelTank
     /if (${Select[${NetBots[${currClient}].Class.ShortName},CLR,DRU,SHM]} && ${Bool[${NetBots[${currClient}].InZone}]} && ${NetBots[${currClient}].PctHPs} <= 95) {
       |/echo ${currClient}:${NetBots[${currClient}].PctHPs} is a Priest in need of peeling
       /for i 1 to ${SpawnCount[playerstate 4 npc targetable radius ${AE_Radius} zradius 25]}
+ /if (${SpawnCount[playerstate 4 npc targetable radius ${AE_Radius} zradius 25]}==0) /break
         /varset peelTarget ${NearestSpawn[${i},playerstate 4 npc targetable radius ${AE_Radius} zradius 25].ID}
         /call TrueTarget ${peelTarget}
         /delay 1s ${Target.BuffsPopulated}
         |/echo checking ${peelTarget} ${Spawn[id ${peelTarget}].Name} for healer target
         /if (${Select[${Me.TargetOfTarget.Class.ShortName},CLR,DRU,SHM]}) {
           /bc [+y+] ${peelTarget} ${Spawn[id ${peelTarget}].Name} is targeting ${Me.TargetOfTarget.Name} : peeling!
-          /netfollow off
+          /afollow off
           /varset peelTankOriginalAssistTarget ${AssistTarget}
           /varset AssistTarget ${peelTarget}
-          /varset doTaunt TRUE
+          |/varset doTaunt TRUE
           /stick 9 front
           /attack on
           /delay 2s ${Target.Distance} < 12
           /doability Taunt
-          /if (${Me.CombatAbilityReady[Mock]}) /doability Mock
-          /if (${Me.AltAbilityReady[Divine Stun]}) /casting "Divine Stun"
+          /if (${Me.CombatAbilityReady[Mock]}) {
+            /doability Mock
+            /delay 3
+          }
+          /if (${Me.CombatAbilityReady[Bazu Bellow]}) /call castSimpleSpell "Bazu Bellow" 0
+          /if (${Me.AltAbilityReady[Divine Stun]}) /call castSimpleSpell "Divine Stun" 0
+          /if (${Me.SpellReady[Terror of Discord]}) /call castSimpleSpell "Terror of Discord" 0
           /return
         } else {
           /varset peelTarget 0
